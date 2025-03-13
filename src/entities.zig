@@ -139,7 +139,7 @@ pub const Terrain = struct {
             }
 
             // Ensure height stays within reasonable bounds
-            prev_height = std.math.clamp(prev_height, GAME_HEIGHT / 2, GAME_HEIGHT - 50);
+            prev_height = std.math.clamp(prev_height, @as(f32, @floatFromInt(GAME_HEIGHT / 2)), @as(f32, @floatFromInt(GAME_HEIGHT - 50)));
 
             heights[i] = prev_height;
         }
@@ -206,7 +206,10 @@ pub const Terrain = struct {
                     @as(f32, @floatFromInt(x - screen_x1)) / @as(f32, @floatFromInt(screen_x2 - screen_x1))
                 else
                     0.0;
-                const y = @as(usize, @intFromFloat(min_y1 + progress * @as(f32, @floatFromInt(@as(isize, @intCast(min_y2)) - @as(isize, @intCast(min_y1))))));
+
+                // Calculate interpolated y position
+                const y_float = @as(f32, @floatFromInt(min_y1)) + progress * (@as(f32, @floatFromInt(min_y2)) - @as(f32, @floatFromInt(min_y1)));
+                const y = @as(usize, @intFromFloat(y_float));
 
                 // Draw vertical line from terrain to bottom
                 for (y..max_y) |py| {
@@ -242,7 +245,7 @@ pub const Terrain = struct {
 
         if (abs_dx > abs_dy) {
             // Line is more horizontal than vertical
-            var err: isize = abs_dx / 2;
+            var err: isize = @divTrunc(abs_dx, 2);
             const step_y: isize = if (dy < 0) -1 else 1;
 
             if (dx < 0) {
@@ -272,7 +275,7 @@ pub const Terrain = struct {
             }
         } else {
             // Line is more vertical than horizontal
-            var err: isize = abs_dy / 2;
+            var err: isize = @divTrunc(abs_dy, 2);
             const step_x: isize = if (dx < 0) -1 else 1;
 
             if (dy < 0) {

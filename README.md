@@ -81,9 +81,9 @@ terrain = generateTerrainSegment(allocator, seed, length, difficulty);
 
 ## Development Roadmap
 
-- [x] Basic vehicle physics and controls
-- [x] Simple procedural terrain generation
-- [x] Pixel array sprite rendering system
+- [ ] Basic vehicle physics and controls
+- [ ] Simple procedural terrain generation
+- [ ] Pixel array sprite rendering system
 - [ ] Generate bike/truck with pixel art array (Sprites as Pixel Array)
 - [ ] Generate trees and rocks procedurally (Pixel Array function based on params + seed)
 - [ ] Procedurally generate terrain (include multiple types with different frictions/attributes)
