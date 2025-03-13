@@ -291,7 +291,7 @@
 </head>
 <body>
     <div class="container">
-        <div class="game-title" style="font-size: 32px; margin: 10px 0;">  FlapFlap  </div>
+        <div class="game-title" style="font-size: 32px; margin: 10px 0;">Hill Climber</div>
         
         <div class="score-display">Score: <span id="score">0</span></div>
         <div class="high-score">High Score: <span id="high-score">0</span></div>
@@ -318,7 +318,7 @@
             </div>
         </div>
         
-        <button id="jump-button" class="jump-button">JUMP (Space)</button>
+        <button id="jump-button" class="jump-button">START / RESTART GAME</button>
         
         <div class="status">
             <p id="status">WASM module loading...</p>
@@ -327,9 +327,14 @@
         <div class="controls-info">
             <h3>Controls</h3>
             <ul>
-                <li>Space: Jump</li>
-                <li>Click/Tap: Jump</li>
+                <li>Right Arrow/D: Accelerate</li>
+                <li>Left Arrow/A: Brake</li>
+                <li>Up Arrow/W: Tilt backward (wheelie)</li>
+                <li>Down Arrow/S: Tilt forward</li>
+                <li>R: Reset game</li>
                 <li>P: Pause/Resume</li>
+                <li>M: Toggle mute</li>
+                <li>Space/Click: Start/Restart game</li>
             </ul>
         </div>
         
@@ -764,6 +769,86 @@
                         case 'P':
                             event.preventDefault();
                             togglePause();
+                            break;
+                        case 'm': // M key
+                        case 'M':
+                            event.preventDefault();
+                            if (typeof zigModule.toggleMute === 'function') {
+                                zigModule.toggleMute();
+                            }
+                            break;
+                        case 'r': // R key
+                        case 'R':
+                            event.preventDefault();
+                            if (typeof zigModule.handleResetKey === 'function') {
+                                zigModule.handleResetKey();
+                                // Hide game over message when resetting
+                                gameOverMessage.classList.remove('visible');
+                            }
+                            break;
+                        case 'ArrowRight': // Right arrow
+                        case 'd':
+                        case 'D':
+                            if (typeof zigModule.handleRightKeyDown === 'function') {
+                                zigModule.handleRightKeyDown();
+                            }
+                            break;
+                        case 'ArrowLeft': // Left arrow
+                        case 'a':
+                        case 'A':
+                            if (typeof zigModule.handleLeftKeyDown === 'function') {
+                                zigModule.handleLeftKeyDown();
+                            }
+                            break;
+                        case 'ArrowUp': // Up arrow
+                        case 'w':
+                        case 'W':
+                            if (typeof zigModule.handleUpKeyDown === 'function') {
+                                zigModule.handleUpKeyDown();
+                            }
+                            break;
+                        case 'ArrowDown': // Down arrow
+                        case 's':
+                        case 'S':
+                            if (typeof zigModule.handleDownKeyDown === 'function') {
+                                zigModule.handleDownKeyDown();
+                            }
+                            break;
+                    }
+                });
+                
+                // Add keyboard event listener for key up events
+                window.addEventListener('keyup', (event) => {
+                    if (!zigModule) return;
+                    
+                    switch(event.key) {
+                        case 'ArrowRight': // Right arrow
+                        case 'd':
+                        case 'D':
+                            if (typeof zigModule.handleRightKeyUp === 'function') {
+                                zigModule.handleRightKeyUp();
+                            }
+                            break;
+                        case 'ArrowLeft': // Left arrow
+                        case 'a':
+                        case 'A':
+                            if (typeof zigModule.handleLeftKeyUp === 'function') {
+                                zigModule.handleLeftKeyUp();
+                            }
+                            break;
+                        case 'ArrowUp': // Up arrow
+                        case 'w':
+                        case 'W':
+                            if (typeof zigModule.handleUpKeyUp === 'function') {
+                                zigModule.handleUpKeyUp();
+                            }
+                            break;
+                        case 'ArrowDown': // Down arrow
+                        case 's':
+                        case 'S':
+                            if (typeof zigModule.handleDownKeyUp === 'function') {
+                                zigModule.handleDownKeyUp();
+                            }
                             break;
                     }
                 });

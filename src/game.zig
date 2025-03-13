@@ -32,6 +32,11 @@ pub const Game = struct {
     victory_render_timer: f32,
     // Input state
     right_key_pressed: bool,
+    left_key_pressed: bool,
+    up_key_pressed: bool,
+    down_key_pressed: bool,
+    // Audio state
+    is_muted: bool,
 
     pub fn init(alloc: std.mem.Allocator, width: usize, height: usize) !Game {
         // Initialize renderer
@@ -59,6 +64,10 @@ pub const Game = struct {
             .gameover_render_timer = 0,
             .victory_render_timer = 0,
             .right_key_pressed = false,
+            .left_key_pressed = false,
+            .up_key_pressed = false,
+            .down_key_pressed = false,
+            .is_muted = false,
         };
 
         // Initialize bike at a safe starting position
@@ -107,6 +116,9 @@ pub const Game = struct {
 
         // Reset input state
         self.right_key_pressed = false;
+        self.left_key_pressed = false;
+        self.up_key_pressed = false;
+        self.down_key_pressed = false;
     }
 
     pub fn update(self: *Game, delta_time: f32) void {
@@ -148,12 +160,27 @@ pub const Game = struct {
             return;
         }
 
-        // Handle input
+        // Handle input for bike movement
         if (self.right_key_pressed) {
             self.bike.accelerate(capped_delta);
+        } else if (self.left_key_pressed) {
+            // Apply brakes
+            self.bike.velocity_x *= 0.95;
         } else {
-            // Apply friction when not accelerating
+            // Apply normal friction when not accelerating
             self.bike.velocity_x *= 0.98;
+        }
+
+        // Handle tilt controls
+        if (self.up_key_pressed) {
+            // Tilt bike backward (wheelie)
+            self.bike.setTilt(-30.0);
+        } else if (self.down_key_pressed) {
+            // Tilt bike forward
+            self.bike.setTilt(30.0);
+        } else if (!self.up_key_pressed and !self.down_key_pressed) {
+            // Return to neutral tilt gradually
+            self.bike.setTilt(self.bike.tilt_factor * 0.8);
         }
 
         // Update bike
@@ -187,7 +214,9 @@ pub const Game = struct {
         if (self.state == GameState.GameOver) return;
 
         self.state = GameState.GameOver;
-        self.audio_system.playSound(.Fail);
+        if (!self.is_muted) {
+            self.audio_system.playSound(.Fail);
+        }
 
         // Update high score if needed
         if (self.score > self.high_score) {
@@ -199,7 +228,9 @@ pub const Game = struct {
         if (self.state == GameState.Victory) return;
 
         self.state = GameState.Victory;
-        self.audio_system.playSound(.Jump); // Reuse jump sound for victory
+        if (!self.is_muted) {
+            self.audio_system.playSound(.Jump); // Reuse jump sound for victory
+        }
 
         // Update high score if needed
         if (self.score > self.high_score) {
@@ -246,6 +277,11 @@ pub const Game = struct {
         const score_x = entities.GAME_WIDTH - 100;
         self.renderer.drawRect(score_x, 10, 90, 20, .{ 0, 0, 0 });
         self.renderer.drawRect(score_x + 1, 11, 88, 18, .{ 255, 255, 255 });
+
+        // Draw mute indicator if muted
+        if (self.is_muted) {
+            self.renderer.drawRect(entities.GAME_WIDTH - 30, 40, 20, 20, .{ 255, 0, 0 });
+        }
     }
 
     fn renderMenu(self: *Game) void {
@@ -332,6 +368,7 @@ pub const Game = struct {
         }
     }
 
+    // Input handlers for directional controls
     pub fn handleRightKeyDown(self: *Game) void {
         if (self.state == GameState.Playing) {
             self.right_key_pressed = true;
@@ -342,6 +379,36 @@ pub const Game = struct {
         self.right_key_pressed = false;
     }
 
+    pub fn handleLeftKeyDown(self: *Game) void {
+        if (self.state == GameState.Playing) {
+            self.left_key_pressed = true;
+        }
+    }
+
+    pub fn handleLeftKeyUp(self: *Game) void {
+        self.left_key_pressed = false;
+    }
+
+    pub fn handleUpKeyDown(self: *Game) void {
+        if (self.state == GameState.Playing) {
+            self.up_key_pressed = true;
+        }
+    }
+
+    pub fn handleUpKeyUp(self: *Game) void {
+        self.up_key_pressed = false;
+    }
+
+    pub fn handleDownKeyDown(self: *Game) void {
+        if (self.state == GameState.Playing) {
+            self.down_key_pressed = true;
+        }
+    }
+
+    pub fn handleDownKeyUp(self: *Game) void {
+        self.down_key_pressed = false;
+    }
+
     pub fn togglePause(self: *Game) void {
         if (self.state == GameState.Playing) {
             self.state = GameState.Paused;
@@ -349,6 +416,10 @@ pub const Game = struct {
         } else if (self.state == GameState.Paused) {
             self.state = GameState.Playing;
         }
+    }
+
+    pub fn toggleMute(self: *Game) void {
+        self.is_muted = !self.is_muted;
     }
 
     pub fn deinit(self: *Game, alloc: std.mem.Allocator) void {

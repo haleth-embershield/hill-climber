@@ -61,18 +61,63 @@ export fn handleRightKeyUp() void {
     game.handleRightKeyUp();
 }
 
+// Handle up key down (w key or up arrow)
+export fn handleUpKeyDown() void {
+    game.handleUpKeyDown();
+}
+
+// Handle up key up
+export fn handleUpKeyUp() void {
+    game.handleUpKeyUp();
+}
+
+// Handle down key down (s key or down arrow)
+export fn handleDownKeyDown() void {
+    game.handleDownKeyDown();
+}
+
+// Handle down key up
+export fn handleDownKeyUp() void {
+    game.handleDownKeyUp();
+}
+
+// Handle left key down (a key or left arrow)
+export fn handleLeftKeyDown() void {
+    game.handleLeftKeyDown();
+}
+
+// Handle left key up
+export fn handleLeftKeyUp() void {
+    game.handleLeftKeyUp();
+}
+
+// Handle reset key (R)
+export fn handleResetKey() void {
+    _ = game.reset(allocator) catch {
+        logString("Failed to reset game");
+        return;
+    };
+    logString("Game reset with R key");
+}
+
+// Handle pause key (P)
+export fn togglePause() void {
+    game.togglePause();
+    logString("Game pause toggled");
+}
+
+// Handle mute key (M)
+export fn toggleMute() void {
+    game.toggleMute();
+    logString("Audio mute toggled");
+}
+
 // Handle mouse click
 export fn handleClick(x_pos: f32, y_pos: f32) void {
     _ = x_pos;
     _ = y_pos;
     // Just call handleJump for any click
     handleJump();
-}
-
-// Toggle pause state
-export fn togglePause() void {
-    game.togglePause();
-    logString("Game pause toggled");
 }
 
 // Clean up resources when the module is unloaded

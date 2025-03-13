@@ -27,6 +27,7 @@ pub const Bike = struct {
     fuel: f32,
     is_on_ground: bool,
     audio_system: *audio.AudioSystem,
+    tilt_factor: f32, // Added to track manual tilt
 
     pub fn init(x: f32, y: f32, audio_system: *audio.AudioSystem) Bike {
         return Bike{
@@ -38,6 +39,7 @@ pub const Bike = struct {
             .fuel = INITIAL_FUEL,
             .is_on_ground = false,
             .audio_system = audio_system,
+            .tilt_factor = 0,
         };
     }
 
@@ -63,9 +65,29 @@ pub const Bike = struct {
             // Calculate rotation based on terrain slope
             const next_height = terrain.getHeightAt(self.x + 10);
             const slope = (next_height - terrain_height) / 10.0;
-            self.rotation = std.math.atan(slope) * (180.0 / std.math.pi);
+            const terrain_angle = std.math.atan(slope) * (180.0 / std.math.pi);
+
+            // Combine terrain angle with manual tilt
+            self.rotation = terrain_angle + self.tilt_factor;
+
+            // Apply physics effects based on tilt
+            if (self.tilt_factor < -20.0 and self.velocity_x > 50.0) {
+                // Wheelie gives slight boost
+                self.velocity_x += 20.0 * delta_time;
+            } else if (self.tilt_factor > 20.0 and self.velocity_x > 50.0) {
+                // Forward tilt improves downhill speed
+                if (terrain_angle < 0) {
+                    self.velocity_x += 30.0 * delta_time;
+                }
+            }
+
+            // Gradually reduce tilt factor when on ground
+            self.tilt_factor *= 0.95;
         } else {
             self.is_on_ground = false;
+
+            // In air, tilt affects vertical velocity slightly
+            self.velocity_y += self.tilt_factor * delta_time * 5.0;
         }
 
         // Consume fuel when moving
@@ -89,6 +111,10 @@ pub const Bike = struct {
         if (self.is_on_ground) {
             self.audio_system.playSound(.Jump); // Reuse jump sound for now
         }
+    }
+
+    pub fn setTilt(self: *Bike, tilt_amount: f32) void {
+        self.tilt_factor = tilt_amount;
     }
 
     pub fn render(self: Bike, renderer_obj: *renderer.Renderer, camera_x: f32) void {
