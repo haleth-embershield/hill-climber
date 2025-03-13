@@ -1,16 +1,14 @@
-# Zig-WASM-WebGL Game Template
+# Hill Climber
 
-A modern, high-performance game development template using Zig, WebAssembly, and WebGL. This template provides a solid foundation for building browser-based games with excellent performance characteristics and memory safety.
+A retro-style hill climbing game built with Zig, WebAssembly, and WebGL. Race your vehicle up procedurally generated terrain, navigate challenging obstacles, and reach the highest peaks!
 
-## Features
+## Game Features
 
-- **WebAssembly Integration**: Compile Zig code to WebAssembly for near-native performance in the browser
-- **WebGL Rendering**: Clean, efficient hardware-accelerated graphics with a command buffer system
-- **Memory-Safe Architecture**: Leverages Zig's memory safety features for robust game development
-- **Optimized Build Pipeline**: Streamlined build process with development server included
-- **Cross-Platform**: Works on any modern browser that supports WebAssembly and WebGL
-- **Responsive Design**: Adapts to different screen sizes and device capabilities
-- **Minimal JS-WASM Boundary**: Optimized communication between JavaScript and WebAssembly
+- **Pixel Art Sprites**: Retro-style vehicles and environment elements rendered using pixel array art
+- **Procedural Generation**: Dynamically generated terrain, obstacles, and environments for endless gameplay
+- **Physics-Based Gameplay**: Realistic vehicle physics with suspension, gravity, and terrain interaction
+- **Multiple Vehicles**: Choose from different vehicles (bikes, trucks, etc.) with unique handling characteristics
+- **Progressive Difficulty**: Increasingly challenging terrain as you advance
 
 ## Getting Started
 
@@ -26,12 +24,16 @@ zig build run
 
 # Just build and deploy without running the server
 zig build deploy
-
-# Alternative: After deploying, serve with Python's HTTP server
-zig build deploy
-cd dist
-python -m http.server
 ```
+
+## Game Controls
+
+- **Arrow Up/Down**: Accelerate/Brake
+- **Arrow Left/Right**: Tilt vehicle
+- **R**: Reset vehicle position
+- **P**: Pause game
+- **M**: Toggle mute audio
+- **1-3**: Select different vehicles
 
 ## Project Structure
 
@@ -39,8 +41,11 @@ python -m http.server
 src/
   ├── main.zig       (WASM exports and initialization)
   ├── game.zig       (Game state and logic)
-  ├── entities.zig   (Game objects like Bird and Pipe)
+  ├── entities.zig   (Game objects like vehicles and terrain)
   ├── renderer.zig   (WebGL rendering system)
+  ├── physics.zig    (Vehicle and terrain physics)
+  ├── procedural.zig (Procedural generation systems)
+  ├── sprites.zig    (Pixel array sprite definitions)
   ├── audio.zig      (Audio system)
   └── assets/        (Game assets to be bundled into WASM)
 web/
@@ -49,154 +54,44 @@ web/
   └── assets/        (General assets to be served)
 ```
 
-## Technical Architecture
+## Implementation Highlights
 
-### Renderer System
+### Pixel Array Sprites
 
-The renderer is designed with a clear, stateful API that manages its own resources and batches WebGL operations efficiently:
-
-```zig
-// Initialize the renderer
-var renderer = try Renderer.init(allocator, 800, 600);
-defer renderer.deinit(allocator);
-
-// In game loop:
-renderer.beginFrame(.{ 0, 0, 0 });  // Clear screen
-renderer.drawRect(10, 10, 100, 50, .{ 255, 0, 0 });  // Draw shapes
-renderer.drawCircle(400, 300, 25, .{ 0, 255, 0 });
-renderer.endFrame();  // Submit to WebGL
-```
-
-#### Key Features
-
-1. **Resource Management**
-   - Automatic frame buffer management
-   - Safe resource cleanup with defer
-   - No manual texture or buffer handling needed
-
-2. **Command Buffer System**
-   ```zig
-   const CommandBuffer = struct {
-       commands: []u32,
-       count: usize,
-       capacity: usize,
-       // ... methods for batching commands
-   };
-   ```
-   - Batches WebGL operations for efficiency
-   - Minimizes JS-WASM boundary crossings
-   - Automatic command submission
-
-3. **Drawing Primitives**
-   ```zig
-   pub const Renderer = struct {
-       pub fn drawPixel(self: *Renderer, x: usize, y: usize, color: [3]u8) void;
-       pub fn drawRect(self: *Renderer, x: usize, y: usize, width: usize, height: usize, color: [3]u8) void;
-       pub fn drawCircle(self: *Renderer, center_x: usize, center_y: usize, radius: usize, color: [3]u8) void;
-   };
-   ```
-   - Hardware-accelerated shape rendering
-   - Pixel-perfect drawing operations
-   - Bounds checking for safety
-
-### Game Integration
-
-The renderer integrates cleanly with game entities:
+The game uses pixel arrays for rendering sprites, allowing for efficient memory usage and retro aesthetics:
 
 ```zig
-// In Bird entity
-pub fn render(self: Bird, renderer: *Renderer) void {
-    const x = @intFromFloat(@max(0, @min(self.x, GAME_WIDTH - 1)));
-    const y = @intFromFloat(@max(0, @min(self.y, GAME_HEIGHT - 1)));
-    renderer.drawCircle(x, y, BIRD_SIZE / 2, .{ 255, 255, 0 });
-}
-
-// In Game update loop
-pub fn renderGame(self: *Game) void {
-    self.renderer.beginFrame(.{ 135, 206, 235 });  // Sky blue
-    
-    // Draw game objects
-    self.bird.render(&self.renderer);
-    for (self.pipes[0..self.pipe_count]) |*pipe| {
-        pipe.render(&self.renderer);
-    }
-    
-    self.renderer.endFrame();
-}
-```
-
-### Performance Optimizations
-
-1. **Command Batching**
-   - All draw calls are batched into a single WebGL texture update
-   - Single draw call per frame
-   - Minimal state changes
-
-2. **Memory Management**
-   - Single frame buffer allocation at initialization
-   - No per-frame allocations
-   - Efficient memory reuse
-
-3. **Frame Timing**
-   - Intelligent frame rate limiting for different game states
-   - Menu: 10 FPS to save resources
-   - Game: Full frame rate for smooth gameplay
-   - Paused/GameOver: Reduced updates
-
-## API Reference
-
-### Renderer
-
-```zig
-pub const Renderer = struct {
-    // Initialization
-    pub fn init(allocator: std.mem.Allocator, width: usize, height: usize) !Renderer;
-    pub fn deinit(self: *Renderer, allocator: std.mem.Allocator) void;
-
-    // Frame Control
-    pub fn beginFrame(self: *Renderer, clear_color: [3]u8) void;
-    pub fn endFrame(self: *Renderer) void;
-
-    // Drawing Operations
-    pub fn drawPixel(self: *Renderer, x: usize, y: usize, color: [3]u8) void;
-    pub fn drawRect(self: *Renderer, x: usize, y: usize, width: usize, height: usize, color: [3]u8) void;
-    pub fn drawCircle(self: *Renderer, center_x: usize, center_y: usize, radius: usize, color: [3]u8) void;
+// Example pixel array for a motorcycle sprite
+const MOTORCYCLE_SPRITE = [_][_]u8{
+    .{0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0},
+    .{0,0,0,0,0,1,2,2,2,1,0,0,0,0,0,0},
+    // ... more rows ...
+    .{0,3,3,3,3,0,0,0,0,0,3,3,3,3,0,0},
 };
 ```
 
-### Usage Example
+### Procedural Terrain
+
+The game generates terrain procedurally, creating unique landscapes each time you play:
 
 ```zig
-// Game initialization
-pub fn init(allocator: std.mem.Allocator) !Game {
-    return Game{
-        .renderer = try Renderer.init(allocator, GAME_WIDTH, GAME_HEIGHT),
-        // ... other initialization
-    };
-}
-
-// Game rendering
-pub fn render(self: *Game) void {
-    self.renderer.beginFrame(.{ 135, 206, 235 });  // Clear to sky blue
-    
-    // Draw background
-    self.renderer.drawRect(0, GAME_HEIGHT - 50, GAME_WIDTH, 50, .{ 83, 54, 10 });
-    
-    // Draw entities
-    self.player.render(&self.renderer);
-    for (self.objects) |*obj| {
-        obj.render(&self.renderer);
-    }
-    
-    self.renderer.endFrame();
-}
+// Generate terrain with varying difficulty
+terrain = generateTerrainSegment(allocator, seed, length, difficulty);
 ```
 
-## TODOs:
-- [ ] Update canvas size. Currently we set size in index.html AND entities.zig - We should have one source of truth and it should be easily adjustable (different aspect ratios, etc) by future developers to give desktop vs mobile options.
-- [ ] Implement threading? or just forgo this and move straight to new webgpu template.
-- [ ] Implement incremental loading. Multiple wasm files/assets to allow larger game structures.
-- [ ] Implement sprite and texture rendering/manipulations.
+## Development Roadmap
+
+- [x] Basic vehicle physics and controls
+- [x] Simple procedural terrain generation
+- [x] Pixel array sprite rendering system
+- [ ] Generate bike/truck with pixel art array (Sprites as Pixel Array)
+- [ ] Generate trees and rocks procedurally (Pixel Array function based on params + seed)
+- [ ] Procedurally generate terrain (include multiple types with different frictions/attributes)
+- [ ] Add multiple vehicle types with different characteristics
+- [ ] Implement game progression and difficulty scaling
+- [ ] Add sound effects and background music
+- [ ] Implement a scoring and achievement system
+- [ ] Add mobile touch controls
 
 ## License
 
@@ -205,5 +100,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Acknowledgments
 
 - Built with the Zig programming language
-- Inspired by modern game development practices
+- Based on the [zig-wasm-webgl](https://github.com/haleth-embershield/zig-wasm-webgl) template
+- Inspired by classic hill climbing games
 - WebAssembly and WebGL communities

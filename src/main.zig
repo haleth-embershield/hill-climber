@@ -1,4 +1,4 @@
-// A simple FlappyBird-style game built with Zig v0.14 targeting WebAssembly to be used as a template.
+// A simple Hill Climber game built with Zig v0.14 targeting WebAssembly.
 
 const std = @import("std");
 const game_mod = @import("game.zig");
@@ -29,12 +29,15 @@ export fn init() void {
         return;
     };
 
-    logString("FlappyBird initialized");
+    logString("Hill Climber initialized");
 }
 
 // Start or reset the game
 export fn resetGame() void {
-    game.reset();
+    _ = game.reset(allocator) catch {
+        logString("Failed to reset game");
+        return;
+    };
     logString("Game reset");
 }
 
@@ -43,9 +46,19 @@ export fn update(delta_time: f32) void {
     game.update(delta_time);
 }
 
-// Handle jump (spacebar or click)
+// Handle jump (spacebar or click) - now used to start/restart game
 export fn handleJump() void {
     game.handleJump();
+}
+
+// Handle right key down (d key or right arrow)
+export fn handleRightKeyDown() void {
+    game.handleRightKeyDown();
+}
+
+// Handle right key up
+export fn handleRightKeyUp() void {
+    game.handleRightKeyUp();
 }
 
 // Handle mouse click

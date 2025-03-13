@@ -9,15 +9,15 @@ pub const GameState = enum {
     Playing,
     Paused,
     GameOver,
+    Victory,
 };
 
 // Game data structure
 pub const Game = struct {
     state: GameState,
-    bird: entities.Bird,
-    pipes: [10]entities.Pipe,
-    pipe_count: usize,
-    spawn_timer: f32,
+    bike: entities.Bike,
+    terrain: entities.Terrain,
+    camera_x: f32,
     score: u32,
     high_score: u32,
     random_seed: u32,
@@ -29,6 +29,9 @@ pub const Game = struct {
     menu_render_timer: f32,
     pause_render_timer: f32,
     gameover_render_timer: f32,
+    victory_render_timer: f32,
+    // Input state
+    right_key_pressed: bool,
 
     pub fn init(alloc: std.mem.Allocator, width: usize, height: usize) !Game {
         // Initialize renderer
@@ -37,13 +40,15 @@ pub const Game = struct {
         // Initialize audio system
         const audio_system = audio.AudioSystem.init();
 
+        // Initialize terrain
+        const terrain = try entities.Terrain.init(alloc, entities.TERRAIN_LENGTH, 12345);
+
         // Create a properly initialized game data structure
         var game = Game{
             .state = GameState.Menu,
-            .bird = undefined, // Will be initialized below
-            .pipes = undefined, // Will be initialized below
-            .pipe_count = 0,
-            .spawn_timer = 0,
+            .bike = undefined, // Will be initialized below
+            .terrain = terrain,
+            .camera_x = 0,
             .score = 0,
             .high_score = 0,
             .random_seed = 12345,
@@ -52,20 +57,12 @@ pub const Game = struct {
             .menu_render_timer = 0,
             .pause_render_timer = 0,
             .gameover_render_timer = 0,
+            .victory_render_timer = 0,
+            .right_key_pressed = false,
         };
 
-        // Initialize bird
-        game.bird = entities.Bird.init(entities.GAME_WIDTH / 4, entities.GAME_HEIGHT / 2, &game.audio_system);
-
-        // Initialize all pipes as inactive
-        for (0..game.pipes.len) |i| {
-            game.pipes[i] = entities.Pipe{
-                .x = 0,
-                .gap_y = 0,
-                .active = false,
-                .passed = false,
-            };
-        }
+        // Initialize bike at a safe starting position
+        game.bike = entities.Bike.init(entities.BIKE_SIZE * 2, entities.GAME_HEIGHT / 2, &game.audio_system);
 
         return game;
     }
@@ -81,24 +78,24 @@ pub const Game = struct {
         return min + (self.random() % (max - min));
     }
 
-    pub fn reset(self: *Game) void {
+    pub fn reset(self: *Game, alloc: std.mem.Allocator) !void {
         // Update high score if needed
         if (self.score > self.high_score) {
             self.high_score = self.score;
         }
 
-        // Reset game state with bird in a safe position
-        const safe_x = entities.GAME_WIDTH / 4;
-        const safe_y = entities.GAME_HEIGHT / 2;
-        self.bird = entities.Bird.init(safe_x, safe_y, &self.audio_system);
+        // Deinitialize old terrain
+        self.terrain.deinit(alloc);
 
-        // Clear all existing pipes
-        for (0..self.pipe_count) |i| {
-            self.pipes[i].active = false;
-        }
-        self.pipe_count = 0;
+        // Create new terrain with different seed
+        self.random_seed += 1;
+        self.terrain = try entities.Terrain.init(alloc, entities.TERRAIN_LENGTH, self.random_seed);
 
-        self.spawn_timer = 0;
+        // Reset bike to starting position
+        self.bike = entities.Bike.init(entities.BIKE_SIZE * 2, entities.GAME_HEIGHT / 2, &self.audio_system);
+
+        // Reset camera and score
+        self.camera_x = 0;
         self.score = 0;
         self.state = GameState.Playing;
 
@@ -106,18 +103,10 @@ pub const Game = struct {
         self.menu_render_timer = 0;
         self.pause_render_timer = 0;
         self.gameover_render_timer = 0;
-    }
+        self.victory_render_timer = 0;
 
-    fn addPipe(self: *Game) void {
-        if (self.pipe_count >= self.pipes.len) return;
-
-        // Random gap position between 150 and canvas_height - 150
-        const min_gap_y: u32 = 150;
-        const max_gap_y: u32 = @intCast(entities.GAME_HEIGHT - 150);
-        const gap_y = @as(f32, @floatFromInt(self.randomInRange(min_gap_y, max_gap_y)));
-
-        self.pipes[self.pipe_count] = entities.Pipe.init(entities.GAME_WIDTH, gap_y);
-        self.pipe_count += 1;
+        // Reset input state
+        self.right_key_pressed = false;
     }
 
     pub fn update(self: *Game, delta_time: f32) void {
@@ -128,6 +117,16 @@ pub const Game = struct {
             // Only redraw menu occasionally to save performance
             self.menu_render_timer += capped_delta;
             self.renderMenu();
+            return;
+        }
+
+        if (self.state == GameState.Victory) {
+            // Update victory screen
+            self.victory_render_timer += capped_delta;
+            if (self.victory_render_timer >= 0.2) { // Redraw at 5 FPS
+                self.victory_render_timer = 0;
+                self.renderGame();
+            }
             return;
         }
 
@@ -149,50 +148,36 @@ pub const Game = struct {
             return;
         }
 
-        // Update bird
-        self.bird.update(capped_delta);
+        // Handle input
+        if (self.right_key_pressed) {
+            self.bike.accelerate(capped_delta);
+        } else {
+            // Apply friction when not accelerating
+            self.bike.velocity_x *= 0.98;
+        }
 
-        // Check for collision with floor or ceiling
-        const hit_ceiling = self.bird.y < entities.BIRD_SIZE / 2;
-        const hit_floor = self.bird.y > entities.GAME_HEIGHT - entities.BIRD_SIZE / 2;
+        // Update bike
+        self.bike.update(capped_delta, &self.terrain);
 
-        if (hit_ceiling or hit_floor) {
+        // Update camera to follow bike
+        if (self.bike.x > self.camera_x + entities.GAME_WIDTH / 3) {
+            self.camera_x = self.bike.x - entities.GAME_WIDTH / 3;
+        }
+
+        // Check for out of fuel
+        if (self.bike.fuel <= 0 and self.bike.velocity_x < 1.0) {
             self.gameOver();
             return;
         }
 
-        // Update pipes and spawn new ones
-        self.spawn_timer += capped_delta;
-        if (self.spawn_timer >= entities.PIPE_SPAWN_INTERVAL) {
-            self.spawn_timer = 0;
-            self.addPipe();
+        // Check for reaching finish line
+        if (self.bike.x >= self.terrain.finish_position) {
+            self.victory();
+            return;
         }
 
-        var i: usize = 0;
-        while (i < self.pipe_count) {
-            var pipe = &self.pipes[i];
-            pipe.update(capped_delta);
-
-            // Check for collision with pipe
-            if (pipe.checkCollision(self.bird)) {
-                self.gameOver();
-                return;
-            }
-
-            // Check if bird passed the pipe
-            if (!pipe.passed and self.bird.x > pipe.x + entities.PIPE_WIDTH) {
-                pipe.passed = true;
-                self.score += 1;
-            }
-
-            // Remove inactive pipes
-            if (!pipe.active) {
-                self.pipes[i] = self.pipes[self.pipe_count - 1];
-                self.pipe_count -= 1;
-            } else {
-                i += 1;
-            }
-        }
+        // Update score based on distance traveled
+        self.score = @intFromFloat(self.bike.x / 100.0);
 
         // Render the current frame
         self.renderGame();
@@ -210,26 +195,57 @@ pub const Game = struct {
         }
     }
 
+    fn victory(self: *Game) void {
+        if (self.state == GameState.Victory) return;
+
+        self.state = GameState.Victory;
+        self.audio_system.playSound(.Jump); // Reuse jump sound for victory
+
+        // Update high score if needed
+        if (self.score > self.high_score) {
+            self.high_score = self.score;
+        }
+    }
+
     fn renderGame(self: *Game) void {
         // Clear the screen with sky blue
         self.renderer.beginFrame(.{ 135, 206, 235 });
 
-        // Draw ground
-        self.renderer.drawRect(0, entities.GAME_HEIGHT - 50, entities.GAME_WIDTH, 50, .{ 83, 54, 10 });
+        // Draw terrain
+        self.terrain.render(&self.renderer, self.camera_x);
 
-        // Draw grass
-        self.renderer.drawRect(0, entities.GAME_HEIGHT - 50, entities.GAME_WIDTH, 5, .{ 34, 139, 34 });
+        // Draw bike
+        self.bike.render(&self.renderer, self.camera_x);
 
-        // Draw pipes
-        for (self.pipes[0..self.pipe_count]) |*pipe| {
-            pipe.render(&self.renderer);
+        // Draw HUD
+        self.renderHUD();
+
+        // Draw game state overlays
+        if (self.state == GameState.GameOver) {
+            self.renderGameOver();
+        } else if (self.state == GameState.Paused) {
+            self.renderPaused();
+        } else if (self.state == GameState.Victory) {
+            self.renderVictory();
         }
-
-        // Draw bird
-        self.bird.render(&self.renderer);
 
         // End frame
         self.renderer.endFrame();
+    }
+
+    fn renderHUD(self: *Game) void {
+        // Draw fuel gauge
+        const fuel_width = @as(usize, @intFromFloat(self.bike.fuel * 2.0));
+        self.renderer.drawRect(10, 10, fuel_width, 20, .{ 255, 215, 0 });
+        self.renderer.drawRect(10, 10, 200, 1, .{ 0, 0, 0 }); // Top border
+        self.renderer.drawRect(10, 30, 200, 1, .{ 0, 0, 0 }); // Bottom border
+        self.renderer.drawRect(10, 10, 1, 20, .{ 0, 0, 0 }); // Left border
+        self.renderer.drawRect(210, 10, 1, 20, .{ 0, 0, 0 }); // Right border
+
+        // Draw score
+        const score_x = entities.GAME_WIDTH - 100;
+        self.renderer.drawRect(score_x, 10, 90, 20, .{ 0, 0, 0 });
+        self.renderer.drawRect(score_x + 1, 11, 88, 18, .{ 255, 255, 255 });
     }
 
     fn renderMenu(self: *Game) void {
@@ -239,17 +255,48 @@ pub const Game = struct {
         // Clear the screen with sky blue
         self.renderer.beginFrame(.{ 135, 206, 235 });
 
-        // Draw ground
-        self.renderer.drawRect(0, entities.GAME_HEIGHT - 50, entities.GAME_WIDTH, 50, .{ 83, 54, 10 });
+        // Draw a sample terrain
+        self.terrain.render(&self.renderer, 0);
 
-        // Draw grass
-        self.renderer.drawRect(0, entities.GAME_HEIGHT - 50, entities.GAME_WIDTH, 5, .{ 34, 139, 34 });
-
-        // Draw a sample bird in the center
-        self.renderer.drawCircle(entities.GAME_WIDTH / 2, entities.GAME_HEIGHT / 2, @intFromFloat(entities.BIRD_SIZE / 2), .{ 255, 255, 0 });
+        // Draw a sample bike in the center
+        const bike = entities.Bike.init(entities.GAME_WIDTH / 2, entities.GAME_HEIGHT / 2, &self.audio_system);
+        bike.render(&self.renderer, 0);
 
         // End frame
         self.renderer.endFrame();
+    }
+
+    fn renderGameOver(self: *Game) void {
+        // Draw semi-transparent overlay
+        for (0..entities.GAME_WIDTH) |x| {
+            for (0..entities.GAME_HEIGHT) |y| {
+                if ((x + y) % 2 == 0) { // Checkerboard pattern
+                    self.renderer.drawPixel(x, y, .{ 0, 0, 0 });
+                }
+            }
+        }
+    }
+
+    fn renderPaused(self: *Game) void {
+        // Draw semi-transparent overlay
+        for (0..entities.GAME_WIDTH) |x| {
+            for (0..entities.GAME_HEIGHT) |y| {
+                if ((x + y) % 4 == 0) { // Sparse pattern
+                    self.renderer.drawPixel(x, y, .{ 0, 0, 0 });
+                }
+            }
+        }
+    }
+
+    fn renderVictory(self: *Game) void {
+        // Draw semi-transparent overlay
+        for (0..entities.GAME_WIDTH) |x| {
+            for (0..entities.GAME_HEIGHT) |y| {
+                if ((x + y) % 3 == 0) { // Different pattern
+                    self.renderer.drawPixel(x, y, .{ 255, 215, 0 }); // Gold color
+                }
+            }
+        }
     }
 
     pub fn handleJump(self: *Game) void {
@@ -260,8 +307,7 @@ pub const Game = struct {
             self.menu_render_timer = 0;
             self.pause_render_timer = 0;
             self.gameover_render_timer = 0;
-            // Ensure bird is in a safe position when starting
-            self.bird = entities.Bird.init(entities.GAME_WIDTH / 4, entities.GAME_HEIGHT / 2, &self.audio_system);
+            self.victory_render_timer = 0;
             return;
         }
 
@@ -273,16 +319,27 @@ pub const Game = struct {
             return;
         }
 
-        if (self.state == GameState.GameOver) {
-            // Reset game if game over
+        if (self.state == GameState.GameOver or self.state == GameState.Victory) {
+            // Reset game if game over or victory
             // Reset render timers
             self.gameover_render_timer = 0;
-            self.reset();
+            self.victory_render_timer = 0;
+            _ = self.reset(std.heap.page_allocator) catch {
+                // Handle error
+                return;
+            };
             return;
         }
+    }
 
-        // Make the bird jump
-        self.bird.jump();
+    pub fn handleRightKeyDown(self: *Game) void {
+        if (self.state == GameState.Playing) {
+            self.right_key_pressed = true;
+        }
+    }
+
+    pub fn handleRightKeyUp(self: *Game) void {
+        self.right_key_pressed = false;
     }
 
     pub fn togglePause(self: *Game) void {
@@ -295,6 +352,7 @@ pub const Game = struct {
     }
 
     pub fn deinit(self: *Game, alloc: std.mem.Allocator) void {
+        self.terrain.deinit(alloc);
         self.renderer.deinit(alloc);
     }
 };
