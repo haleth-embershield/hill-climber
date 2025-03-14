@@ -262,8 +262,8 @@ function executeBatchedCommands(commandBuffer, width, height, zigMemory) {
                 const packedParams = commandData[cmdIndex + 3];
                 const dataType = packedParams & 0xFFFF;
                 const normalized = ((packedParams >> 16) & 0x1) === 1;
-                const stride = (packedParams >> 17) & 0x7FFF;
-                const offset = (packedParams >> 24) & 0xFFFF;
+                const stride = (packedParams >> 17) & 0xFF; // 8 bits for stride (max 255)
+                const offset = (packedParams >> 24) & 0xFFFF; // 16 bits for offset
                 
                 // Make sure we have a buffer bound before setting attributes
                 if (gl.getParameter(gl.ARRAY_BUFFER_BINDING) === null) {
@@ -271,6 +271,7 @@ function executeBatchedCommands(commandBuffer, width, height, zigMemory) {
                     break;
                 }
                 
+                console.log('vertexAttribPointer:', attrIndex, size, dataType, normalized, stride, offset);
                 gl.vertexAttribPointer(attrIndex, size, dataType, normalized, stride, offset);
                 break;
                 

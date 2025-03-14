@@ -100,12 +100,21 @@ const CommandBuffer = struct {
         self.commands[index_cmd] = @intFromEnum(WebGLCommand.VertexAttribPointer);
         self.commands[index_cmd + 1] = index;
         self.commands[index_cmd + 2] = @as(u32, @bitCast(@as(u32, @intCast(size))));
+
+        // WebGL has a maximum stride limit (255 bytes in WebGL 1.0)
+        // Make sure we don't exceed it
+        const safe_stride = @min(stride, 255);
+
         // Pack normalized, stride, and offset into a single u32
         // Use only the lower bits for each value to avoid overflow
         const norm_bit: u32 = if (normalized) 1 else 0;
-        const stride_val: u32 = @intCast(@as(u32, @intCast(stride)) & 0x7FFF); // Use 15 bits for stride
+        const stride_val: u32 = @intCast(@as(u32, @intCast(safe_stride)) & 0xFF); // Use 8 bits for stride (max 255)
         const offset_val: u32 = @intCast(offset & 0xFFFF); // Use 16 bits for offset
+
+        // Pack the values differently to avoid bit shifting issues
+        // data_type (lower 16 bits) | norm_bit (1 bit) | stride (8 bits) | offset (16 bits in upper position)
         self.commands[index_cmd + 3] = data_type | (norm_bit << 16) | (stride_val << 17) | (offset_val << 24);
+
         self.count += 1;
     }
 
@@ -481,8 +490,20 @@ pub const Renderer = struct {
         // In a real implementation, we'd store the mesh object and get its buffer IDs
         // For now, we'll use the mesh_id as the vertex buffer ID and mesh_id + 1 as the index buffer ID
 
-        // Use the shader program first
+        // Make sure we're using the shader program
+        shaders_mod.useShaderProgram(self.shader_program);
+
+        // Bind vertex buffer BEFORE setting attributes
         self.command_buffer.addBindBufferCommand(GL.ARRAY_BUFFER, vertex_buffer_id);
+
+        // Execute the command to bind the buffer
+        executeBatchedCommands(self.command_buffer.getBufferPtr(), @intCast(self.frame_buffer.width), @intCast(self.frame_buffer.height));
+        self.command_buffer.reset();
+
+        // Calculate stride - WebGL has a maximum stride limit
+        // The Vertex struct has position (12 bytes), normal (12 bytes), and color (16 bytes)
+        // Total size is 40 bytes, which should be within WebGL's limit
+        const stride = @sizeOf(mesh_mod.Vertex);
 
         // Verify buffer is bound before setting attributes
         // Position attribute
@@ -490,7 +511,7 @@ pub const Renderer = struct {
             3, // size (x, y, z)
             GL.FLOAT, // type
             false, // normalized
-            @sizeOf(mesh_mod.Vertex), // stride
+            @intCast(stride), // stride
             0 // offset
         );
         self.command_buffer.addEnableVertexAttribArrayCommand(0);
@@ -500,7 +521,7 @@ pub const Renderer = struct {
             3, // size (nx, ny, nz)
             GL.FLOAT, // type
             false, // normalized
-            @sizeOf(mesh_mod.Vertex), // stride
+            @intCast(stride), // stride
             @offsetOf(mesh_mod.Vertex, "normal") // offset
         );
         self.command_buffer.addEnableVertexAttribArrayCommand(1);
@@ -510,12 +531,16 @@ pub const Renderer = struct {
             4, // size (r, g, b, a)
             GL.FLOAT, // type
             false, // normalized
-            @sizeOf(mesh_mod.Vertex), // stride
+            @intCast(stride), // stride
             @offsetOf(mesh_mod.Vertex, "color") // offset
         );
         self.command_buffer.addEnableVertexAttribArrayCommand(2);
 
-        // Bind index buffer before computing matrices
+        // Execute the commands to set up vertex attributes
+        executeBatchedCommands(self.command_buffer.getBufferPtr(), @intCast(self.frame_buffer.width), @intCast(self.frame_buffer.height));
+        self.command_buffer.reset();
+
+        // Bind index buffer before drawing
         self.command_buffer.addBindBufferCommand(GL.ELEMENT_ARRAY_BUFFER, index_buffer_id);
 
         // Compute model-view-projection matrix
@@ -550,13 +575,23 @@ pub const Renderer = struct {
         // Draw the mesh - use a fixed index count for now
         const index_count: i32 = 36; // Assuming a box mesh with 12 triangles (6 faces * 2 triangles)
         self.command_buffer.addDrawElementsCommand(GL.TRIANGLES, index_count, GL.UNSIGNED_SHORT, 0);
+
+        // Execute the commands to draw the mesh
+        executeBatchedCommands(self.command_buffer.getBufferPtr(), @intCast(self.frame_buffer.width), @intCast(self.frame_buffer.height));
+        self.command_buffer.reset();
     }
 
     /// Finish frame and send commands to WebGL
     pub fn endFrame(self: *Renderer) void {
+        // Add texture upload and draw commands
         self.command_buffer.addTextureCommand(self.frame_buffer.data.ptr);
         self.command_buffer.addDrawCommand();
-        executeBatchedCommands(self.command_buffer.getBufferPtr(), @intCast(self.frame_buffer.width), @intCast(self.frame_buffer.height));
+
+        // Execute the final commands for the frame
+        if (self.command_buffer.count > 0) {
+            executeBatchedCommands(self.command_buffer.getBufferPtr(), @intCast(self.frame_buffer.width), @intCast(self.frame_buffer.height));
+            self.command_buffer.reset();
+        }
     }
 
     /// Draw a single pixel (kept for backward compatibility)
