@@ -116,8 +116,10 @@ pub const Camera = struct {
     pub fn rotateIsometricView(self: *Camera) void {
         // Store the current distance from target
         const dx = self.position[0] - self.target[0];
+        // Y component stays the same in a Y-axis rotation
         // const dy = self.position[1] - self.target[1];
         const dz = self.position[2] - self.target[2];
+        // We don't need the full 3D distance, just the xz plane distance
         // const distance = math.sqrt(dx * dx + dy * dy + dz * dz);
 
         // Rotate 90 degrees around Y axis (swap and negate X and Z components)
@@ -128,7 +130,19 @@ pub const Camera = struct {
         self.position[0] = self.target[0] - old_z; // -Z becomes new X
         self.position[2] = self.target[2] + old_x; // X becomes new Z
 
-        // Y component stays the same in a Y-axis rotation
+        // Ensure we maintain the same height (Y component)
+        // and the same distance from target
+        const new_dx = self.position[0] - self.target[0];
+        const new_dz = self.position[2] - self.target[2];
+        const new_distance_xz = math.sqrt(new_dx * new_dx + new_dz * new_dz);
+        const original_distance_xz = math.sqrt(dx * dx + dz * dz);
+
+        // Scale to maintain the same distance
+        if (new_distance_xz > 0.001) {
+            const scale = original_distance_xz / new_distance_xz;
+            self.position[0] = self.target[0] + new_dx * scale;
+            self.position[2] = self.target[2] + new_dz * scale;
+        }
 
         // Update view matrix with the new position
         self.updateViewMatrix();

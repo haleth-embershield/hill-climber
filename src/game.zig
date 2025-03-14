@@ -6,6 +6,14 @@ const camera = @import("renderer/camera.zig");
 const mesh = @import("renderer/mesh.zig");
 const input = @import("input.zig");
 
+// WASM imports for browser interaction
+extern "env" fn consoleLog(ptr: [*]const u8, len: usize) void;
+
+// Helper to log strings to browser console
+fn logString(msg: []const u8) void {
+    consoleLog(msg.ptr, msg.len);
+}
+
 // Game state enum
 pub const GameState = enum {
     Menu,
@@ -199,10 +207,6 @@ pub const Game = struct {
             // Accelerate forward
             const forward_dir = [_]f32{ 1.0, 0.0, 0.0 };
             self.truck.accelerate(forward_dir, models.truck_ACCELERATION, capped_delta);
-
-            // Make sure camera follows immediately when accelerating
-            const camera_offset = [_]f32{ 14.43, 14.43, 14.43 };
-            self.camera.followTarget(self.truck.model.position, camera_offset);
         } else if (left_pressed) {
             // Apply brakes
             self.truck.velocity[0] *= 0.95;
@@ -225,11 +229,6 @@ pub const Game = struct {
 
         // Update truck physics
         self.truck.update(capped_delta);
-
-        // Always ensure camera follows truck after position update
-        // Use a fixed offset for isometric view
-        const camera_offset = [_]f32{ 14.43, 14.43, 14.43 };
-        self.camera.followTarget(self.truck.model.position, camera_offset);
 
         // Check for out of fuel
         if (self.truck.fuel <= 0 and self.truck.velocity[0] < 1.0) {
@@ -279,10 +278,15 @@ pub const Game = struct {
     fn renderGame(self: *Game) void {
         // Update camera to follow the truck
         const camera_offset = [_]f32{ 14.43, 14.43, 14.43 }; // Isometric view offset
+
+        // Always ensure camera follows the current truck position
         self.camera.followTarget(self.truck.model.position, camera_offset);
 
         // Make sure the camera's view matrix is updated
         self.camera.updateViewMatrix();
+
+        // Update the combined view-projection matrix
+        self.camera.updateViewProjectionMatrix();
 
         // Clear the screen with sky blue
         self.renderer.beginFrame(.{ 135, 206, 235 });
