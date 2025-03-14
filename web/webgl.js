@@ -408,6 +408,45 @@ function createProgramForWasm(vertexShaderId, fragmentShaderId) {
     return programId;
 }
 
+// Delete a shader
+function deleteShaderForWasm(shaderId) {
+    if (!gl) {
+        console.error('WebGL not initialized');
+        return;
+    }
+    
+    const shader = glResources.shaders[shaderId];
+    if (shader) {
+        gl.deleteShader(shader);
+        delete glResources.shaders[shaderId];
+    }
+}
+
+// Delete a program
+function deleteProgramForWasm(programId) {
+    if (!gl) {
+        console.error('WebGL not initialized');
+        return;
+    }
+    
+    const program = glResources.programs[programId];
+    if (program) {
+        gl.deleteProgram(program);
+        delete glResources.programs[programId];
+    }
+}
+
+// Use a program
+function useProgramForWasm(programId) {
+    if (!gl) {
+        console.error('WebGL not initialized');
+        return;
+    }
+    
+    const program = glResources.programs[programId] || null;
+    gl.useProgram(program);
+}
+
 // Get uniform location
 function getUniformLocationForWasm(programId, uniformName) {
     if (!gl) {
@@ -422,7 +461,14 @@ function getUniformLocationForWasm(programId, uniformName) {
     }
     
     const location = gl.getUniformLocation(program, uniformName);
-    return location ? 1 : -1; // Simple ID system for demo, in real code you'd map these
+    if (!location) {
+        console.warn(`Uniform ${uniformName} not found in program ${programId}`);
+        return -1;
+    }
+    
+    // Use a simple numeric ID for the uniform location
+    // In a real implementation, you'd want to manage these better
+    return location;
 }
 
 // Get attribute location
@@ -441,6 +487,36 @@ function getAttribLocationForWasm(programId, attribName) {
     return gl.getAttribLocation(program, attribName);
 }
 
+// Set uniform matrix 4x4
+function setUniformMatrix4fvForWasm(location, matrixData) {
+    if (!gl) {
+        console.error('WebGL not initialized');
+        return;
+    }
+    
+    gl.uniformMatrix4fv(location, false, matrixData);
+}
+
+// Set uniform vec3
+function setUniform3fForWasm(location, x, y, z) {
+    if (!gl) {
+        console.error('WebGL not initialized');
+        return;
+    }
+    
+    gl.uniform3f(location, x, y, z);
+}
+
+// Set uniform vec4
+function setUniform4fForWasm(location, x, y, z, w) {
+    if (!gl) {
+        console.error('WebGL not initialized');
+        return;
+    }
+    
+    gl.uniform4f(location, x, y, z, w);
+}
+
 // Export the WebGL interface
 window.WebGLInterface = {
     init: initWebGL,
@@ -448,10 +524,21 @@ window.WebGLInterface = {
     executeBatch: executeBatchedCommands,
     clearCanvas: clearCanvas,
     isSupported: isWebGLSupported,
+    
+    // Shader and program functions
     createShader: createShaderForWasm,
     createProgram: createProgramForWasm,
+    deleteShader: deleteShaderForWasm,
+    deleteProgram: deleteProgramForWasm,
+    useProgram: useProgramForWasm,
+    
+    // Uniform and attribute functions
     getUniformLocation: getUniformLocationForWasm,
     getAttribLocation: getAttribLocationForWasm,
+    setUniformMatrix4fv: setUniformMatrix4fvForWasm,
+    setUniform3f: setUniform3fForWasm,
+    setUniform4f: setUniform4fForWasm,
+    
     // Export WebGL constants
     GL_ARRAY_BUFFER: GL_CONSTANTS.GL_ARRAY_BUFFER,
     GL_ELEMENT_ARRAY_BUFFER: GL_CONSTANTS.GL_ELEMENT_ARRAY_BUFFER,
@@ -465,5 +552,9 @@ window.WebGLInterface = {
     GL_STATIC_DRAW: GL_CONSTANTS.GL_STATIC_DRAW,
     GL_DYNAMIC_DRAW: GL_CONSTANTS.GL_DYNAMIC_DRAW,
     GL_COLOR_BUFFER_BIT: GL_CONSTANTS.GL_COLOR_BUFFER_BIT,
-    GL_DEPTH_BUFFER_BIT: GL_CONSTANTS.GL_DEPTH_BUFFER_BIT
+    GL_DEPTH_BUFFER_BIT: GL_CONSTANTS.GL_DEPTH_BUFFER_BIT,
+    
+    // Add shader-specific constants
+    GL_VERTEX_SHADER: 0x8B31,
+    GL_FRAGMENT_SHADER: 0x8B30
 };

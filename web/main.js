@@ -199,23 +199,39 @@ const imports = {
         executeBatchedCommands: (cmdPtr, width, height) => {
             window.WebGLInterface.executeBatch(cmdPtr, width, height, wasmModule.memory);
         },
-        createShader: (type, sourcePtr, sourceLen) => {
+        
+        // WebGL shader functions from shaders.zig
+        createShader: (shader_type, source_ptr, source_len) => {
             const buffer = new Uint8Array(wasmModule.memory.buffer);
-            const source = new TextDecoder().decode(buffer.subarray(sourcePtr, sourcePtr + sourceLen));
-            return window.WebGLInterface.createShader(type, source);
+            const source = new TextDecoder().decode(buffer.subarray(source_ptr, source_ptr + source_len));
+            return window.WebGLInterface.createShader(shader_type, source);
         },
-        createProgram: (vertexShaderId, fragmentShaderId) => {
-            return window.WebGLInterface.createProgram(vertexShaderId, fragmentShaderId);
+        createProgram: (vertex_shader_id, fragment_shader_id) => {
+            return window.WebGLInterface.createProgram(vertex_shader_id, fragment_shader_id);
         },
-        getUniformLocation: (programId, namePtr, nameLen) => {
+        deleteShader: (shader_id) => {
+            window.WebGLInterface.deleteShader(shader_id);
+        },
+        deleteProgram: (program_id) => {
+            window.WebGLInterface.deleteProgram(program_id);
+        },
+        useProgram: (program_id) => {
+            window.WebGLInterface.useProgram(program_id);
+        },
+        getUniformLocation: (program_id, name_ptr, name_len) => {
             const buffer = new Uint8Array(wasmModule.memory.buffer);
-            const name = new TextDecoder().decode(buffer.subarray(namePtr, namePtr + nameLen));
-            return window.WebGLInterface.getUniformLocation(programId, name);
+            const name = new TextDecoder().decode(buffer.subarray(name_ptr, name_ptr + name_len));
+            return window.WebGLInterface.getUniformLocation(program_id, name);
         },
-        getAttribLocation: (programId, namePtr, nameLen) => {
-            const buffer = new Uint8Array(wasmModule.memory.buffer);
-            const name = new TextDecoder().decode(buffer.subarray(namePtr, namePtr + nameLen));
-            return window.WebGLInterface.getAttribLocation(programId, name);
+        setUniformMatrix4fv: (location, value_ptr) => {
+            const matrixData = new Float32Array(wasmModule.memory.buffer, value_ptr, 16);
+            window.WebGLInterface.setUniformMatrix4fv(location, matrixData);
+        },
+        setUniform3f: (location, x, y, z) => {
+            window.WebGLInterface.setUniform3f(location, x, y, z);
+        },
+        setUniform4f: (location, x, y, z, w) => {
+            window.WebGLInterface.setUniform4f(location, x, y, z, w);
         }
     }
 };
