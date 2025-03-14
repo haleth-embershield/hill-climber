@@ -81,6 +81,8 @@ async function decodeAudioData(data) {
 
 // WASM module reference
 let wasmModule = null;
+// Make wasmModule globally accessible for the callback system
+window.wasmModule = null;
 
 // Animation state
 let animationFrameId = null;
@@ -438,6 +440,8 @@ async function initWasm() {
         // Instantiate the WebAssembly module
         const { instance } = await WebAssembly.instantiate(wasmBytes, imports);
         wasmModule = instance.exports;
+        // Make wasmModule globally accessible for the callback system
+        window.wasmModule = wasmModule;
         
         // Initialize the WASM module
         wasmModule.init();

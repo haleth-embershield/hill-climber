@@ -29,10 +29,39 @@ const callbackRegistry = {
     invoke: function(type, ...args) {
         const callback = this.callbacks[type];
         if (callback) {
-            callback(...args);
+            try {
+                // For WebAssembly function pointers, we need to use the call method
+                if (typeof callback === 'function') {
+                    callback(...args);
+                } else if (typeof wasmModule !== 'undefined' && wasmModule) {
+                    // Try to find the function in the WebAssembly exports
+                    // This handles cases where we have a function index instead of a direct reference
+                    const functionName = this.getFunctionNameFromType(type);
+                    if (functionName && typeof wasmModule[functionName] === 'function') {
+                        wasmModule[functionName](...args);
+                    } else {
+                        console.error(`Callback for type ${type} is not a valid function`);
+                    }
+                } else {
+                    console.error(`Callback for type ${type} is not a valid function and wasmModule is not available`);
+                }
+            } catch (error) {
+                console.error(`Error invoking callback for type ${type}:`, error);
+            }
         } else {
             console.warn(`No callback registered for type: ${type}`);
         }
+    },
+    
+    // Helper to map callback types to function names in the WebAssembly exports
+    getFunctionNameFromType: function(type) {
+        const mapping = {
+            'buffer_created': 'handleBufferCreated',
+            'shader_created': 'handleShaderCreated',
+            'program_created': 'handleProgramCreated',
+            'error': 'handleError'
+        };
+        return mapping[type];
     }
 };
 
@@ -249,7 +278,6 @@ function executeBatchedCommands(commandBuffer, width, height, zigMemory) {
                 
                 if (bufferToBind) {
                     gl.bindBuffer(bufferType, bufferToBind);
-                    console.log('Bound buffer ID:', bufferIdToBind, 'to target:', bufferType);
                 } else {
                     console.error('Invalid buffer ID:', bufferIdToBind);
                     callbackRegistry.invoke(CallbackType.ERROR, `Invalid buffer ID: ${bufferIdToBind}`);
@@ -304,7 +332,6 @@ function executeBatchedCommands(commandBuffer, width, height, zigMemory) {
                     break;
                 }
                 
-                console.log('vertexAttribPointer:', attrIndex, size, dataType, normalized, stride, offset);
                 gl.vertexAttribPointer(attrIndex, size, dataType, normalized, stride, offset);
                 break;
                 

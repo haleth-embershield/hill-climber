@@ -255,11 +255,21 @@ const ERROR_CALLBACK = "error\x00";
 
 /// Global state for callbacks
 var lastBufferId: u32 = 0;
+var lastShaderId: u32 = 0;
+var lastProgramId: u32 = 0;
 var lastError: []const u8 = "";
 
 /// Callback implementations
 export fn handleBufferCreated(bufferId: u32) void {
     lastBufferId = bufferId;
+}
+
+export fn handleShaderCreated(shaderId: u32) void {
+    lastShaderId = shaderId;
+}
+
+export fn handleProgramCreated(programId: u32) void {
+    lastProgramId = programId;
 }
 
 export fn handleError(errorPtr: [*]const u8, errorLen: usize) void {
@@ -268,11 +278,18 @@ export fn handleError(errorPtr: [*]const u8, errorLen: usize) void {
 
 /// Initialize callbacks
 fn initCallbacks() bool {
-    const buffer_cb: ?*const anyopaque = @ptrCast(&handleBufferCreated);
-    const error_cb: ?*const anyopaque = @ptrCast(&handleError);
+    // Register buffer created callback
+    _ = registerCallback(BUFFER_CREATED_CALLBACK, @ptrCast(&handleBufferCreated));
 
-    _ = registerCallback(BUFFER_CREATED_CALLBACK, buffer_cb);
-    _ = registerCallback(ERROR_CALLBACK, error_cb);
+    // Register shader created callback
+    _ = registerCallback(SHADER_CREATED_CALLBACK, @ptrCast(&handleShaderCreated));
+
+    // Register program created callback
+    _ = registerCallback(PROGRAM_CREATED_CALLBACK, @ptrCast(&handleProgramCreated));
+
+    // Register error callback
+    _ = registerCallback(ERROR_CALLBACK, @ptrCast(&handleError));
+
     return true;
 }
 
