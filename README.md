@@ -28,7 +28,6 @@ zig build deploy
 
 - **Arrow Up/Down**: Accelerate/Brake
 - **Arrow Left/Right**: Tilt vehicle
-- **R**: Reset vehicle position
 - **P**: Pause game
 - **M**: Toggle mute audio
 - **1-3**: Select different vehicles
