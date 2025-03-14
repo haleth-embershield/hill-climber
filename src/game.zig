@@ -327,6 +327,13 @@ pub const Game = struct {
                 .KeyM => {
                     self.toggleMute();
                 },
+                .KeyO => {
+                    self.camera.rotateIsometricView();
+                    // Force immediate render to see the rotation
+                    self.renderGame();
+                    // Log for debugging
+                    logString("Camera rotated");
+                },
                 .Space => {
                     if (self.state == .GameOver) {
                         _ = self.reset(self.alloc) catch {};
