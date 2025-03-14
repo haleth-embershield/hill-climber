@@ -1,6 +1,6 @@
 const std = @import("std");
-const entities = @import("entities.zig");
-const renderer = @import("renderer.zig");
+const models = @import("models.zig");
+const renderer = @import("renderer/core.zig");
 const audio = @import("audio.zig");
 
 // Game state enum
@@ -15,8 +15,8 @@ pub const GameState = enum {
 // Game data structure
 pub const Game = struct {
     state: GameState,
-    bike: entities.Bike,
-    terrain: entities.Terrain,
+    truck: models.Truck,
+    terrain: models.Terrain,
     camera_x: f32,
     score: u32,
     high_score: u32,
@@ -46,7 +46,7 @@ pub const Game = struct {
         const audio_system = audio.AudioSystem.init();
 
         // Initialize terrain
-        const terrain = try entities.Terrain.init(alloc, entities.TERRAIN_LENGTH, 12345);
+        const terrain = try models.Terrain.init(alloc, models.TERRAIN_LENGTH, 12345);
 
         // Create a properly initialized game data structure
         var game = Game{
@@ -71,7 +71,7 @@ pub const Game = struct {
         };
 
         // Initialize bike at a safe starting position
-        game.bike = entities.Bike.init(entities.BIKE_SIZE * 2, entities.GAME_HEIGHT / 2, &game.audio_system);
+        game.truck = models.Truck.init(models.TRUCK_SIZE * 2, models.GAME_HEIGHT / 2, &game.audio_system);
 
         return game;
     }
@@ -98,10 +98,10 @@ pub const Game = struct {
 
         // Create new terrain with different seed
         self.random_seed += 1;
-        self.terrain = try entities.Terrain.init(alloc, entities.TERRAIN_LENGTH, self.random_seed);
+        self.terrain = try models.Terrain.init(alloc, models.TERRAIN_LENGTH, self.random_seed);
 
         // Reset bike to starting position
-        self.bike = entities.Bike.init(entities.BIKE_SIZE * 2, entities.GAME_HEIGHT / 2, &self.audio_system);
+        self.truck = models.Truck.init(models.TRUCK_SIZE * 2, models.GAME_HEIGHT / 2, &self.audio_system);
 
         // Reset camera and score
         self.camera_x = 0;
@@ -187,24 +187,24 @@ pub const Game = struct {
         self.bike.update(capped_delta, &self.terrain);
 
         // Update camera to follow bike
-        if (self.bike.x > self.camera_x + entities.GAME_WIDTH / 3) {
-            self.camera_x = self.bike.x - entities.GAME_WIDTH / 3;
+        if (self.truck.x > self.camera_x + models.GAME_WIDTH / 3) {
+            self.camera_x = self.truck.x - models.GAME_WIDTH / 3;
         }
 
         // Check for out of fuel
-        if (self.bike.fuel <= 0 and self.bike.velocity_x < 1.0) {
+        if (self.truck.fuel <= 0 and self.truck.velocity_x < 1.0) {
             self.gameOver();
             return;
         }
 
         // Check for reaching finish line
-        if (self.bike.x >= self.terrain.finish_position) {
+        if (self.truck.x >= self.terrain.finish_position) {
             self.victory();
             return;
         }
 
         // Update score based on distance traveled
-        self.score = @intFromFloat(self.bike.x / 100.0);
+        self.score = @intFromFloat(self.truck.x / 100.0);
 
         // Render the current frame
         self.renderGame();
@@ -274,13 +274,13 @@ pub const Game = struct {
         self.renderer.drawRect(210, 10, 1, 20, .{ 0, 0, 0 }); // Right border
 
         // Draw score
-        const score_x = entities.GAME_WIDTH - 100;
+        const score_x = models.GAME_WIDTH - 100;
         self.renderer.drawRect(score_x, 10, 90, 20, .{ 0, 0, 0 });
         self.renderer.drawRect(score_x + 1, 11, 88, 18, .{ 255, 255, 255 });
 
         // Draw mute indicator if muted
         if (self.is_muted) {
-            self.renderer.drawRect(entities.GAME_WIDTH - 30, 40, 20, 20, .{ 255, 0, 0 });
+            self.renderer.drawRect(models.GAME_WIDTH - 30, 40, 20, 20, .{ 255, 0, 0 });
         }
     }
 
@@ -295,8 +295,8 @@ pub const Game = struct {
         self.terrain.render(&self.renderer, 0);
 
         // Draw a sample bike in the center
-        const bike = entities.Bike.init(entities.GAME_WIDTH / 2, entities.GAME_HEIGHT / 2, &self.audio_system);
-        bike.render(&self.renderer, 0);
+        const truck = models.Truck.init(models.GAME_WIDTH / 2, models.GAME_HEIGHT / 2, &self.audio_system);
+        truck.render(&self.renderer, 0);
 
         // End frame
         self.renderer.endFrame();
@@ -304,8 +304,8 @@ pub const Game = struct {
 
     fn renderGameOver(self: *Game) void {
         // Draw semi-transparent overlay
-        for (0..entities.GAME_WIDTH) |x| {
-            for (0..entities.GAME_HEIGHT) |y| {
+        for (0..models.GAME_WIDTH) |x| {
+            for (0..models.GAME_HEIGHT) |y| {
                 if ((x + y) % 2 == 0) { // Checkerboard pattern
                     self.renderer.drawPixel(x, y, .{ 0, 0, 0 });
                 }
@@ -315,8 +315,8 @@ pub const Game = struct {
 
     fn renderPaused(self: *Game) void {
         // Draw semi-transparent overlay
-        for (0..entities.GAME_WIDTH) |x| {
-            for (0..entities.GAME_HEIGHT) |y| {
+        for (0..models.GAME_WIDTH) |x| {
+            for (0..models.GAME_HEIGHT) |y| {
                 if ((x + y) % 4 == 0) { // Sparse pattern
                     self.renderer.drawPixel(x, y, .{ 0, 0, 0 });
                 }
@@ -326,8 +326,8 @@ pub const Game = struct {
 
     fn renderVictory(self: *Game) void {
         // Draw semi-transparent overlay
-        for (0..entities.GAME_WIDTH) |x| {
-            for (0..entities.GAME_HEIGHT) |y| {
+        for (0..models.GAME_WIDTH) |x| {
+            for (0..models.GAME_HEIGHT) |y| {
                 if ((x + y) % 3 == 0) { // Different pattern
                     self.renderer.drawPixel(x, y, .{ 255, 215, 0 }); // Gold color
                 }

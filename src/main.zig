@@ -2,8 +2,8 @@
 
 const std = @import("std");
 const game_mod = @import("game.zig");
-const entities = @import("entities.zig");
-const renderer = @import("renderer.zig");
+const models = @import("models.zig");
+const renderer = @import("renderer/core.zig");
 const audio = @import("audio.zig");
 
 // WASM imports for browser interaction
@@ -24,7 +24,7 @@ export fn init() void {
     allocator = std.heap.page_allocator;
 
     // Initialize game data
-    game = game_mod.Game.init(allocator, entities.GAME_WIDTH, entities.GAME_HEIGHT) catch {
+    game = game_mod.Game.init(allocator, models.GAME_WIDTH, models.GAME_HEIGHT) catch {
         logString("Failed to initialize game");
         return;
     };

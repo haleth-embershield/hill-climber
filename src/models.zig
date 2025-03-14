@@ -1,5 +1,5 @@
 const std = @import("std");
-const renderer = @import("renderer.zig");
+const renderer = @import("renderer/core.zig");
 const audio = @import("audio.zig");
 
 // Game constants
