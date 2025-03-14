@@ -244,14 +244,14 @@ pub fn createHill(allocator: std.mem.Allocator, width: f32, depth: f32, height: 
             const x_pos = ((@as(f32, @floatFromInt(x)) / @as(f32, @floatFromInt(segment_count))) - 0.5) * width;
             const z_pos = ((@as(f32, @floatFromInt(z)) / @as(f32, @floatFromInt(segment_count))) - 0.5) * depth;
 
-            // Generate height using a sine wave pattern
+            // Generate height using a sine wave pattern that goes from 0 to -height
             const dist = @sqrt(x_pos * x_pos + z_pos * z_pos) / (width / 2.0);
-            const y_pos = @sin(dist * 3.0) * height * (1.0 - dist);
+            const y_pos = -@sin(dist * 3.0) * height * (1.0 - dist);
 
-            // Calculate normal
-            const normal_x = -@cos(dist * 3.0) * 3.0 * height * (1.0 - dist) * x_pos / (width / 2.0) / (width / 2.0);
-            const normal_z = -@cos(dist * 3.0) * 3.0 * height * (1.0 - dist) * z_pos / (width / 2.0) / (width / 2.0);
-            const normal_y = 1.0;
+            // Calculate normal (pointing upward)
+            const normal_x = @cos(dist * 3.0) * 3.0 * height * (1.0 - dist) * x_pos / (width / 2.0) / (width / 2.0);
+            const normal_z = @cos(dist * 3.0) * 3.0 * height * (1.0 - dist) * z_pos / (width / 2.0) / (width / 2.0);
+            const normal_y = 1.0; // Normal points up
             const normal_length = @sqrt(normal_x * normal_x + normal_y * normal_y + normal_z * normal_z);
 
             // Set vertex

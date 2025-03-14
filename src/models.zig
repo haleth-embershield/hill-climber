@@ -96,7 +96,8 @@ pub const Vehicle = struct {
             self.model.position[1] = 0.0;
             self.velocity[1] = 0.0;
             self.is_on_ground = true;
-        } else {
+        } else if (self.model.position[1] > 0.0) {
+            // If somehow above ground, apply gravity
             self.is_on_ground = false;
         }
     }
@@ -156,7 +157,7 @@ pub const Terrain = struct {
         };
 
         // Set initial position and scale
-        terrain.model.setPosition(0.0, -2.0, 0.0);
+        terrain.model.setPosition(0.0, 0.0, 0.0);
         terrain.model.setScale(1.0, 1.0, 1.0);
 
         return terrain;

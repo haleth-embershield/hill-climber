@@ -20,8 +20,8 @@ pub const Camera = struct {
             .projection = [_]f32{0} ** 16,
             .view = [_]f32{0} ** 16,
             .view_projection = [_]f32{0} ** 16,
-            .position = [_]f32{ 0, 8, 12 }, // Position camera higher and further back
-            .rotation = [_]f32{ -math.pi / 6.0, 0, math.pi / 4.0 }, // Less steep angle for better view
+            .position = [_]f32{ 10.0, 10.0, 10.0 }, // Position for isometric view
+            .rotation = [_]f32{ -math.pi / 4.0, 0, math.pi / 4.0 }, // Classic isometric angles
         };
 
         // Initialize with identity matrices
@@ -31,7 +31,7 @@ pub const Camera = struct {
 
         // Set up initial matrices
         camera.updateViewMatrix();
-        camera.setOrthographicProjection(-20, 20, -15, 15, 0.1, 100.0); // Wider view frustum with more horizontal space
+        camera.setOrthographicProjection(-10, 10, -10, 10, 0.1, 100.0); // Symmetric view frustum
         camera.updateViewProjectionMatrix();
 
         return camera;

@@ -71,7 +71,7 @@ pub const Game = struct {
 
         // Terrain mesh
         const terrain_color = [_]f32{ 0.3, 0.7, 0.3, 1.0 }; // Green
-        var terrain_mesh = try mesh.createHill(alloc, 20.0, 20.0, 2.0, 20, terrain_color);
+        var terrain_mesh = try mesh.createHill(alloc, 10.0, 10.0, 3.0, 20, terrain_color);
         defer terrain_mesh.deinit();
 
         // Add meshes to renderer
@@ -80,11 +80,12 @@ pub const Game = struct {
 
         // Create game objects
         const truck = models.Vehicle.init(truck_handle);
-        const terrain = models.Terrain.init(terrain_handle, 20.0, 20.0, 2.0);
+        const terrain = models.Terrain.init(terrain_handle, 10.0, 10.0, 3.0);
 
         // Set initial truck position
         var truck_instance = truck;
-        truck_instance.model.setPosition(0.0, 0.0, -5.0);
+        truck_instance.model.setPosition(0.0, 0.0, 0.0);
+        truck_instance.is_on_ground = true; // Set truck as already on ground
 
         return Game{
             .alloc = alloc,
@@ -132,7 +133,7 @@ pub const Game = struct {
         }
 
         // Reset truck to starting position
-        self.truck.model.setPosition(0.0, 0.0, -5.0);
+        self.truck.model.setPosition(0.0, 0.0, 0.0);
         self.truck.model.setRotation(0.0, 0.0, 0.0);
         self.truck.velocity = [_]f32{ 0.0, 0.0, 0.0 };
         self.truck.fuel = models.INITIAL_FUEL;
@@ -203,7 +204,7 @@ pub const Game = struct {
             self.truck.accelerate(forward_dir, models.truck_ACCELERATION, capped_delta);
 
             // Make sure camera follows immediately when accelerating
-            const camera_offset = [_]f32{ -8.0, 10.0, 15.0 };
+            const camera_offset = [_]f32{ 10.0, 10.0, 10.0 };
             self.camera.followTarget(self.truck.model.position, camera_offset);
         } else if (self.left_key_pressed) {
             // Apply brakes
@@ -230,7 +231,7 @@ pub const Game = struct {
 
         // Always ensure camera follows truck after position update
         // Use a fixed offset for isometric view
-        const camera_offset = [_]f32{ -8.0, 10.0, 15.0 };
+        const camera_offset = [_]f32{ 10.0, 10.0, 10.0 };
         self.camera.followTarget(self.truck.model.position, camera_offset);
 
         // Check for out of fuel
@@ -280,7 +281,7 @@ pub const Game = struct {
 
     fn renderGame(self: *Game) void {
         // Update camera to follow the truck
-        const camera_offset = [_]f32{ -8.0, 10.0, 15.0 }; // Adjusted offset for better centering
+        const camera_offset = [_]f32{ 10.0, 10.0, 10.0 }; // Isometric view offset
         self.camera.followTarget(self.truck.model.position, camera_offset);
 
         // Make sure the camera's view matrix is updated
@@ -298,8 +299,8 @@ pub const Game = struct {
 
     fn renderMenu(self: *Game) void {
         // Position camera for menu view
-        const menu_position = [_]f32{ 0.0, 0.0, -5.0 }; // Default truck position
-        const camera_offset = [_]f32{ -8.0, 10.0, 15.0 }; // Same offset as in game
+        const menu_position = [_]f32{ 0.0, 0.0, 0.0 }; // Center position
+        const camera_offset = [_]f32{ 10.0, 10.0, 10.0 }; // Isometric view offset
         self.camera.followTarget(menu_position, camera_offset);
 
         // Clear the screen with sky blue
