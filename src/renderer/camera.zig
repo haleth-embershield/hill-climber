@@ -110,6 +110,29 @@ pub const Camera = struct {
         // Update view matrix with new position and target
         self.updateViewMatrix();
     }
+
+    /// Rotate the camera 90 degrees around the vertical axis (Y-axis)
+    /// This maintains the same distance and isometric angle but shifts to a different viewpoint
+    pub fn rotateIsometricView(self: *Camera) void {
+        // Store the current distance from target
+        const dx = self.position[0] - self.target[0];
+        // const dy = self.position[1] - self.target[1];
+        const dz = self.position[2] - self.target[2];
+        // const distance = math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        // Rotate 90 degrees around Y axis (swap and negate X and Z components)
+        const old_x = dx;
+        const old_z = dz;
+
+        // Calculate new position after 90-degree rotation
+        self.position[0] = self.target[0] - old_z; // -Z becomes new X
+        self.position[2] = self.target[2] + old_x; // X becomes new Z
+
+        // Y component stays the same in a Y-axis rotation
+
+        // Update view matrix with the new position
+        self.updateViewMatrix();
+    }
 };
 
 /// Look-at function to create view matrix
