@@ -100,7 +100,12 @@ const CommandBuffer = struct {
         self.commands[index_cmd] = @intFromEnum(WebGLCommand.VertexAttribPointer);
         self.commands[index_cmd + 1] = index;
         self.commands[index_cmd + 2] = @as(u32, @bitCast(@as(u32, @intCast(size))));
-        self.commands[index_cmd + 3] = data_type | (@as(u32, @intFromBool(normalized)) << 16) | (@as(u32, @intCast(stride)) << 17) | (@as(u32, @intCast(offset)) << 24);
+        // Pack normalized, stride, and offset into a single u32
+        // Use only the lower bits for each value to avoid overflow
+        const norm_bit: u32 = if (normalized) 1 else 0;
+        const stride_val: u32 = @intCast(@as(u32, @intCast(stride)) & 0x7FFF); // Use 15 bits for stride
+        const offset_val: u32 = @intCast(offset & 0xFFFF); // Use 16 bits for offset
+        self.commands[index_cmd + 3] = data_type | (norm_bit << 16) | (stride_val << 17) | (offset_val << 24);
         self.count += 1;
     }
 
@@ -300,8 +305,21 @@ pub const Renderer = struct {
         // Create shader program
         self.shader_program = shaders_mod.createShaderProgram(shaders_mod.basic_vertex_shader, shaders_mod.basic_fragment_shader);
 
+        // Verify shader program was created successfully
+        if (self.shader_program.program_id == 0) {
+            return error.ShaderProgramCreationFailed;
+        }
+
+        // Use the shader program immediately to set it up
+        self.command_buffer.reset();
+        shaders_mod.useShaderProgram(self.shader_program);
+
         // Enable depth testing
         self.command_buffer.addEnableDepthTestCommand();
+
+        // Execute the commands to set up the shader program
+        executeBatchedCommands(self.command_buffer.getBufferPtr(), @intCast(self.frame_buffer.width), @intCast(self.frame_buffer.height));
+        self.command_buffer.reset();
     }
 
     /// Add a mesh to the renderer and return its handle
@@ -362,6 +380,10 @@ pub const Renderer = struct {
         self.command_buffer.addCreateBufferCommand();
         const vertex_buffer_id: u32 = 1; // In a real implementation, we'd get this from WebGL
 
+        // Store buffer ID in mesh
+        var mesh_copy = mesh;
+        mesh_copy.vertex_buffer_id = vertex_buffer_id;
+
         // Bind vertex buffer
         self.command_buffer.addBindBufferCommand(GL.ARRAY_BUFFER, vertex_buffer_id);
 
@@ -370,13 +392,20 @@ pub const Renderer = struct {
 
         // Create index buffer
         self.command_buffer.addCreateBufferCommand();
-        const index_buffer_id = 2; // In a real implementation, we'd get this from WebGL
+        const index_buffer_id = vertex_buffer_id + 1; // Use vertex_buffer_id + 1 for index buffer
+
+        // Store index buffer ID in mesh
+        mesh_copy.index_buffer_id = index_buffer_id;
 
         // Bind index buffer
         self.command_buffer.addBindBufferCommand(GL.ELEMENT_ARRAY_BUFFER, index_buffer_id);
 
         // Upload index data
         self.command_buffer.addBufferDataCommand(GL.ELEMENT_ARRAY_BUFFER, @ptrCast(mesh.getIndexDataPtr()), mesh.getIndexDataSize(), GL.STATIC_DRAW);
+
+        // Execute the commands to create the buffers
+        executeBatchedCommands(self.command_buffer.getBufferPtr(), @intCast(self.frame_buffer.width), @intCast(self.frame_buffer.height));
+        self.command_buffer.reset();
 
         return vertex_buffer_id;
     }
@@ -389,8 +418,10 @@ pub const Renderer = struct {
         // Clear color and depth buffers
         self.command_buffer.addClearCommand(true, true);
 
-        // Use shader program
-        shaders_mod.useShaderProgram(self.shader_program);
+        // Use shader program - make sure to use the program ID
+        if (self.shader_program.program_id != 0) {
+            shaders_mod.useShaderProgram(self.shader_program);
+        }
     }
 
     /// Render the 3D scene
@@ -408,10 +439,10 @@ pub const Renderer = struct {
 
     /// Render a mesh with the given model matrix
     fn renderMesh(self: *Renderer, mesh_id: u32, model_matrix: *const [16]f32) void {
-        // Bind vertex buffer
+        // Use the shader program first
         self.command_buffer.addBindBufferCommand(GL.ARRAY_BUFFER, mesh_id);
 
-        // Set up vertex attributes
+        // Verify buffer is bound before setting attributes
         // Position attribute
         self.command_buffer.addVertexAttribPointerCommand(0, // attribute index
             3, // size (x, y, z)
@@ -442,6 +473,9 @@ pub const Renderer = struct {
         );
         self.command_buffer.addEnableVertexAttribArrayCommand(2);
 
+        // Bind index buffer before computing matrices
+        self.command_buffer.addBindBufferCommand(GL.ELEMENT_ARRAY_BUFFER, mesh_id + 1);
+
         // Compute model-view-projection matrix
         var mvp: [16]f32 = undefined;
         multiplyMatrices(self.camera.getViewProjectionMatrixPtr(), model_matrix, &mvp);
@@ -449,23 +483,31 @@ pub const Renderer = struct {
         // Set uniforms
         // Model-view-projection matrix
         const mvp_loc = shaders_mod.getShaderUniformLocation(self.shader_program.program_id, "u_modelViewProjection");
-        self.command_buffer.addUniformMatrix4fvCommand(mvp_loc, &mvp);
+        if (mvp_loc >= 0) {
+            self.command_buffer.addUniformMatrix4fvCommand(mvp_loc, &mvp);
+        }
 
         // Model matrix
         const model_loc = shaders_mod.getShaderUniformLocation(self.shader_program.program_id, "u_model");
-        self.command_buffer.addUniformMatrix4fvCommand(model_loc, model_matrix);
+        if (model_loc >= 0) {
+            self.command_buffer.addUniformMatrix4fvCommand(model_loc, model_matrix);
+        }
 
         // Light direction
         const light_dir_loc = shaders_mod.getShaderUniformLocation(self.shader_program.program_id, "u_lightDirection");
-        self.command_buffer.addUniform3fCommand(light_dir_loc, 0.5, 1.0, 0.3);
+        if (light_dir_loc >= 0) {
+            self.command_buffer.addUniform3fCommand(light_dir_loc, 0.5, 1.0, 0.3);
+        }
 
         // View position (camera position)
         const view_pos_loc = shaders_mod.getShaderUniformLocation(self.shader_program.program_id, "u_viewPosition");
-        self.command_buffer.addUniform3fCommand(view_pos_loc, self.camera.position[0], self.camera.position[1], self.camera.position[2]);
+        if (view_pos_loc >= 0) {
+            self.command_buffer.addUniform3fCommand(view_pos_loc, self.camera.position[0], self.camera.position[1], self.camera.position[2]);
+        }
 
-        // Draw the mesh
-        self.command_buffer.addDrawElementsCommand(GL.TRIANGLES, 100, // In a real implementation, we'd get the count from the mesh
-            GL.UNSIGNED_SHORT, 0);
+        // Draw the mesh - use a fixed index count for now
+        const index_count: i32 = 36; // Assuming a box mesh with 12 triangles (6 faces * 2 triangles)
+        self.command_buffer.addDrawElementsCommand(GL.TRIANGLES, index_count, GL.UNSIGNED_SHORT, 0);
     }
 
     /// Finish frame and send commands to WebGL

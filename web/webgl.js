@@ -193,22 +193,49 @@ function executeBatchedCommands(commandBuffer, width, height, zigMemory) {
                 break;
                 
             case 3: // CreateBuffer
-                const bufferId = Object.keys(glResources.buffers).length + 1; // Simple id generation
-                glResources.buffers[bufferId] = gl.createBuffer();
+                // Create a new buffer and store it
+                const newBuffer = gl.createBuffer();
+                if (!newBuffer) {
+                    console.error('Failed to create WebGL buffer');
+                    break;
+                }
+                
+                // Generate a buffer ID
+                const bufferId = Object.keys(glResources.buffers).length + 1;
+                glResources.buffers[bufferId] = newBuffer;
+                
+                console.log('Created buffer with ID:', bufferId);
                 break;
                 
             case 4: // BindBuffer
                 const bufferType = commandData[cmdIndex + 1];
                 const bufferIdToBind = commandData[cmdIndex + 2];
-                gl.bindBuffer(bufferType, glResources.buffers[bufferIdToBind]);
+                const bufferToBind = glResources.buffers[bufferIdToBind];
+                
+                if (bufferToBind) {
+                    gl.bindBuffer(bufferType, bufferToBind);
+                    console.log('Bound buffer ID:', bufferIdToBind, 'to target:', bufferType);
+                } else {
+                    console.error('Invalid buffer ID:', bufferIdToBind);
+                }
                 break;
                 
             case 5: // BufferData
                 const bufferTypeForData = commandData[cmdIndex + 1];
                 const dataPointer = commandData[cmdIndex + 2];
                 const dataSize = commandData[cmdIndex + 3];
-                const bufferData = new Uint8Array(zigMemory.buffer, dataPointer, dataSize);
-                gl.bufferData(bufferTypeForData, bufferData, gl.STATIC_DRAW);
+                
+                // Check if we have a buffer bound to the target
+                const boundBuffer = gl.getParameter(bufferTypeForData === GL_CONSTANTS.GL_ARRAY_BUFFER ? 
+                    gl.ARRAY_BUFFER_BINDING : gl.ELEMENT_ARRAY_BUFFER_BINDING);
+                
+                if (boundBuffer) {
+                    const bufferData = new Uint8Array(zigMemory.buffer, dataPointer, dataSize);
+                    gl.bufferData(bufferTypeForData, bufferData, gl.STATIC_DRAW);
+                    console.log('Uploaded', dataSize, 'bytes to buffer type:', bufferTypeForData);
+                } else {
+                    console.error('No buffer bound to target:', bufferTypeForData);
+                }
                 break;
                 
             case 6: // CreateShader
@@ -230,8 +257,14 @@ function executeBatchedCommands(commandBuffer, width, height, zigMemory) {
                 const packedParams = commandData[cmdIndex + 3];
                 const dataType = packedParams & 0xFFFF;
                 const normalized = ((packedParams >> 16) & 0x1) === 1;
-                const stride = (packedParams >> 17) & 0x7F;
-                const offset = (packedParams >> 24);
+                const stride = (packedParams >> 17) & 0x7FFF;
+                const offset = (packedParams >> 24) & 0xFFFF;
+                
+                // Make sure we have a buffer bound before setting attributes
+                if (gl.getParameter(gl.ARRAY_BUFFER_BINDING) === null) {
+                    console.error('No ARRAY_BUFFER bound when calling vertexAttribPointer');
+                    break;
+                }
                 
                 gl.vertexAttribPointer(attrIndex, size, dataType, normalized, stride, offset);
                 break;
@@ -252,15 +285,28 @@ function executeBatchedCommands(commandBuffer, width, height, zigMemory) {
                 break;
                 
             case 12: // UniformMatrix4fv
-                const matLocation = commandData[cmdIndex + 1];
+                const matLocationId = commandData[cmdIndex + 1];
                 const matrixPtr = commandData[cmdIndex + 2];
                 const matrixData = new Float32Array(zigMemory.buffer, matrixPtr, 16);
                 
-                gl.uniformMatrix4fv(matLocation, false, matrixData);
+                // Check if location is valid (non-negative)
+                if (matLocationId >= 0) {
+                    // Get the actual WebGLUniformLocation from our map
+                    const actualLocation = glResources.uniformLocations ? 
+                        glResources.uniformLocations[matLocationId] : null;
+                    
+                    if (actualLocation !== undefined && actualLocation !== null) {
+                        gl.uniformMatrix4fv(actualLocation, false, matrixData);
+                    } else {
+                        console.warn('Invalid uniform location ID:', matLocationId);
+                    }
+                } else {
+                    console.warn('Invalid uniform location ID:', matLocationId);
+                }
                 break;
                 
             case 13: // Uniform3f
-                const vec3Location = commandData[cmdIndex + 1];
+                const vec3LocationId = commandData[cmdIndex + 1];
                 const xScaled = commandData[cmdIndex + 2];
                 const packedYZ = commandData[cmdIndex + 3];
                 
@@ -269,16 +315,48 @@ function executeBatchedCommands(commandBuffer, width, height, zigMemory) {
                 const y = ((packedYZ >> 16) & 0xFFFF) / 1000.0;
                 const z = (packedYZ & 0xFFFF) / 1000.0;
                 
-                gl.uniform3f(vec3Location, x, y, z);
+                // Check if location is valid (non-negative)
+                if (vec3LocationId >= 0) {
+                    // Get the actual WebGLUniformLocation from our map
+                    const actualLocation = glResources.uniformLocations ? 
+                        glResources.uniformLocations[vec3LocationId] : null;
+                    
+                    if (actualLocation !== undefined && actualLocation !== null) {
+                        gl.uniform3f(actualLocation, x, y, z);
+                    } else {
+                        console.warn('Invalid uniform location ID:', vec3LocationId);
+                    }
+                } else {
+                    console.warn('Invalid uniform location ID:', vec3LocationId);
+                }
                 break;
                 
             case 14: // Uniform4f
-                const vec4Location = commandData[cmdIndex + 1];
-                const xVal = commandData[cmdIndex + 2] / 1000.0;
-                const yVal = commandData[cmdIndex + 3] / 1000.0;
-                // Note: z and w values are not properly handled in this simplified version
+                const vec4LocationId = commandData[cmdIndex + 1];
+                const xVal = commandData[cmdIndex + 2];
+                const yVal = commandData[cmdIndex + 3];
                 
-                gl.uniform4f(vec4Location, xVal, yVal, 0.0, 1.0);
+                // Convert back from scaled integers to floats
+                const x4 = xVal / 1000.0;
+                const y4 = yVal / 1000.0;
+                // Note: z and w values are not properly handled in this simplified version
+                const z4 = 0.0;
+                const w4 = 1.0;
+                
+                // Check if location is valid (non-negative)
+                if (vec4LocationId >= 0) {
+                    // Get the actual WebGLUniformLocation from our map
+                    const actualLocation = glResources.uniformLocations ? 
+                        glResources.uniformLocations[vec4LocationId] : null;
+                    
+                    if (actualLocation !== undefined && actualLocation !== null) {
+                        gl.uniform4f(actualLocation, x4, y4, z4, w4);
+                    } else {
+                        console.warn('Invalid uniform location ID:', vec4LocationId);
+                    }
+                } else {
+                    console.warn('Invalid uniform location ID:', vec4LocationId);
+                }
                 break;
                 
             case 15: // EnableDepthTest
@@ -461,14 +539,21 @@ function getUniformLocationForWasm(programId, uniformName) {
     }
     
     const location = gl.getUniformLocation(program, uniformName);
-    if (!location) {
+    if (location === null) {
         console.warn(`Uniform ${uniformName} not found in program ${programId}`);
         return -1;
     }
     
-    // Use a simple numeric ID for the uniform location
-    // In a real implementation, you'd want to manage these better
-    return location;
+    // Store the location in a map and return its index
+    if (!glResources.uniformLocations) {
+        glResources.uniformLocations = {};
+        glResources.nextUniformLocationId = 1;
+    }
+    
+    const locationId = glResources.nextUniformLocationId++;
+    glResources.uniformLocations[locationId] = location;
+    
+    return locationId;
 }
 
 // Get attribute location
@@ -488,33 +573,57 @@ function getAttribLocationForWasm(programId, attribName) {
 }
 
 // Set uniform matrix 4x4
-function setUniformMatrix4fvForWasm(location, matrixData) {
+function setUniformMatrix4fvForWasm(locationId, matrixData) {
     if (!gl) {
         console.error('WebGL not initialized');
         return;
     }
     
-    gl.uniformMatrix4fv(location, false, matrixData);
+    // Get the actual WebGLUniformLocation from our map
+    const actualLocation = glResources.uniformLocations ? 
+        glResources.uniformLocations[locationId] : null;
+    
+    if (actualLocation !== undefined && actualLocation !== null) {
+        gl.uniformMatrix4fv(actualLocation, false, matrixData);
+    } else {
+        console.warn('Invalid uniform location ID:', locationId);
+    }
 }
 
 // Set uniform vec3
-function setUniform3fForWasm(location, x, y, z) {
+function setUniform3fForWasm(locationId, x, y, z) {
     if (!gl) {
         console.error('WebGL not initialized');
         return;
     }
     
-    gl.uniform3f(location, x, y, z);
+    // Get the actual WebGLUniformLocation from our map
+    const actualLocation = glResources.uniformLocations ? 
+        glResources.uniformLocations[locationId] : null;
+    
+    if (actualLocation !== undefined && actualLocation !== null) {
+        gl.uniform3f(actualLocation, x, y, z);
+    } else {
+        console.warn('Invalid uniform location ID:', locationId);
+    }
 }
 
 // Set uniform vec4
-function setUniform4fForWasm(location, x, y, z, w) {
+function setUniform4fForWasm(locationId, x, y, z, w) {
     if (!gl) {
         console.error('WebGL not initialized');
         return;
     }
     
-    gl.uniform4f(location, x, y, z, w);
+    // Get the actual WebGLUniformLocation from our map
+    const actualLocation = glResources.uniformLocations ? 
+        glResources.uniformLocations[locationId] : null;
+    
+    if (actualLocation !== undefined && actualLocation !== null) {
+        gl.uniform4f(actualLocation, x, y, z, w);
+    } else {
+        console.warn('Invalid uniform location ID:', locationId);
+    }
 }
 
 // Export the WebGL interface
