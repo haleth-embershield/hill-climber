@@ -140,3 +140,99 @@
 - **Ask**: Need help with Zig mesh code, WebGL setup, or physics? I’m here!
 
 **Date**: March 13, 2025
+
+
+----------
+
+# Claude Amended Roadmap
+
+## Optimized Language and API Approach
+
+### Zig-Centric Architecture
+**Objective**: Minimize JavaScript code while maximizing Zig/WASM usage.
+- **Core Principle**: Keep all game logic, physics, and matrix math in Zig.
+- **JavaScript Role**: Limited to essential WebGL context setup and render loop.
+
+### Matrix Handling in Zig
+- Replace JavaScript matrix operations with Zig implementations:
+  ```zig
+  // In Zig - create projection matrix
+  fn createIsometricProjection() void {
+      // Initialize orthographic projection
+      projectionMatrix = [_]f32{
+          2.0/(right-left), 0.0, 0.0, 0.0,
+          0.0, 2.0/(top-bottom), 0.0, 0.0,
+          0.0, 0.0, -2.0/(far-near), 0.0,
+          -(right+left)/(right-left), -(top+bottom)/(top-bottom), -(far+near)/(far-near), 1.0
+      };
+      
+      // Apply isometric rotations
+      rotateX(&projectionMatrix, -std.math.pi / 4.0);
+      rotateZ(&projectionMatrix, std.math.pi / 4.0);
+  }
+  
+  // Export for WebGL shader uniforms
+  export fn getProjectionMatrix() [*]f32 {
+      return &projectionMatrix;
+  }
+  ```
+
+### WebGL Integration Strategy
+Consider these options for WebGL integration:
+
+1. **Recommended Hybrid Approach**:
+   - Define core rendering functions in Zig that JavaScript calls
+   - Example:
+     ```zig
+     // Zig exports
+     export fn createVertexBuffer(vertices: [*]f32, count: usize) u32 { ... }
+     export fn drawScene() void { ... }
+     ```
+     ```javascript
+     // JavaScript calls
+     function render() {
+       wasm.drawScene();
+       requestAnimationFrame(render);
+     }
+     ```
+
+2. **Alternative: Full Binding Layer**:
+   - Create a complete WebGL binding API in JavaScript
+   - Pass this API to Zig during initialization
+   - Handle all rendering calls directly from Zig
+
+### Phase 1 Enhancement: Initial WebGL Setup
+- Add depth testing early: `gl.enable(gl.DEPTH_TEST)`
+- Consider implementing a simple camera system in Zig
+- Export buffer creation functions from Zig:
+  ```zig
+  export fn createMeshBuffer(vertices: [*]f32, count: usize) u32 {
+      // Buffer creation logic
+      return bufferId;
+  }
+  ```
+
+### Phase 2 Enhancement: Physics and Collision
+- Implement Verlet integration in Zig for smoother physics
+- Add camera follow logic to keep truck centered
+- Batch hill vertices for better performance
+
+### Phase 4 Enhancement: Optimization Focus
+- Implement frustum culling to avoid rendering off-screen objects
+- Minimize WASM-JS boundary crossings by batching operations
+- Consider using WebGL instancing for repeated objects (trees)
+
+## Build and Development Considerations
+- **Minimal Build Requirements**: For your minimal JS/HTML setup, Bun compilation offers little performance benefit
+- **Development Focus**: Optimize within Zig rather than JS tooling
+- **Critical Areas**:
+  1. Efficient mesh representation
+  2. Batched WebGL calls
+  3. Minimized memory transfers across WASM boundary
+  4. Optimized matrix operations for isometric view
+
+## Next Steps Revised
+1. Implement matrix math and projection setup in Zig
+2. Create exported buffer and render functions in Zig
+3. Set up a minimal JavaScript wrapper for WebGL context
+4. Focus on game logic entirely within the Zig environment
