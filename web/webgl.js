@@ -1,4 +1,4 @@
-// WebGL interface for ASCII Flappy Bird
+// WebGL interface for WASM Game
 
 // Global WebGL context and resources
 let gl = null;
@@ -212,7 +212,7 @@ const GL_CONSTANTS = {
 };
 
 // Export the WebGL interface
-window.AsciiFlappyWebGL = {
+window.WebGLInterface = {
     init: initWebGL,
     renderFrame: renderFrame,
     executeBatch: executeBatchedCommands,

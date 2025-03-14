@@ -87,9 +87,6 @@ let animationFrameId = null;
 let lastTimestamp = 0;
 let isPaused = false;
 
-// Update WebGL interface name
-window.WebGLInterface = window.AsciiFlappyWebGL;
-
 // Check WebGL support and initialize if available
 function checkWebGLSupport() {
     if (!window.WebGLInterface || !window.WebGLInterface.isSupported()) {
