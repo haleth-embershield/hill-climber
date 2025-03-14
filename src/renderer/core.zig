@@ -250,31 +250,38 @@ pub const Renderer = struct {
     shader_program: shaders_mod.ShaderProgram,
     allocator: std.mem.Allocator,
 
-    // Model matrices for objects
-    truck_model_matrix: [16]f32,
-    hill_model_matrix: [16]f32,
-
-    // Mesh IDs
-    truck_mesh_id: u32,
-    hill_mesh_id: u32,
+    // Renderable objects
+    mesh_count: u32,
+    model_matrices: []?[16]f32,
+    mesh_ids: []u32,
+    is_visible: []bool,
 
     /// Initialize a new renderer with a given resolution
     pub fn init(allocator: std.mem.Allocator, width: usize, height: usize) !Renderer {
-        var renderer = Renderer{
+        const max_meshes = 32; // Support up to 32 renderable objects
+
+        var model_matrices = try allocator.alloc(?[16]f32, max_meshes);
+        var mesh_ids = try allocator.alloc(u32, max_meshes);
+        var is_visible = try allocator.alloc(bool, max_meshes);
+
+        // Initialize arrays
+        for (0..max_meshes) |i| {
+            model_matrices[i] = null;
+            mesh_ids[i] = 0;
+            is_visible[i] = false;
+        }
+
+        const renderer = Renderer{
             .command_buffer = try CommandBuffer.init(allocator, 100), // Increased capacity for 3D rendering
             .frame_buffer = try Image.init(allocator, width, height, 3),
             .camera = camera_mod.Camera.init(),
             .shader_program = shaders_mod.ShaderProgram.init("", ""), // Will be initialized properly in setupScene
             .allocator = allocator,
-            .truck_model_matrix = [_]f32{0} ** 16,
-            .hill_model_matrix = [_]f32{0} ** 16,
-            .truck_mesh_id = 0,
-            .hill_mesh_id = 0,
+            .mesh_count = 0,
+            .model_matrices = model_matrices,
+            .mesh_ids = mesh_ids,
+            .is_visible = is_visible,
         };
-
-        // Initialize model matrices to identity
-        identityMatrix(&renderer.truck_model_matrix);
-        identityMatrix(&renderer.hill_model_matrix);
 
         return renderer;
     }
@@ -283,6 +290,9 @@ pub const Renderer = struct {
     pub fn deinit(self: *Renderer, allocator: std.mem.Allocator) void {
         self.command_buffer.deinit(allocator);
         self.frame_buffer.deinit(allocator);
+        allocator.free(self.model_matrices);
+        allocator.free(self.mesh_ids);
+        allocator.free(self.is_visible);
     }
 
     /// Set up the 3D scene with shaders and meshes
@@ -292,36 +302,65 @@ pub const Renderer = struct {
 
         // Enable depth testing
         self.command_buffer.addEnableDepthTestCommand();
+    }
 
-        // Create truck mesh
-        const body_color = [_]f32{ 0.8, 0.2, 0.2, 1.0 }; // Red
-        const wheel_color = [_]f32{ 0.2, 0.2, 0.2, 1.0 }; // Dark gray
-        var truck_mesh = try mesh_mod.createTruck(self.allocator, body_color, wheel_color);
-        defer truck_mesh.deinit();
+    /// Add a mesh to the renderer and return its handle
+    pub fn addMesh(self: *Renderer, mesh: mesh_mod.Mesh) !u32 {
+        if (self.mesh_count >= self.model_matrices.len) {
+            return error.TooManyMeshes;
+        }
 
-        // Create hill mesh
-        const hill_color = [_]f32{ 0.3, 0.7, 0.3, 1.0 }; // Green
-        var hill_mesh = try mesh_mod.createHill(self.allocator, 20.0, 20.0, 2.0, 20, hill_color);
-        defer hill_mesh.deinit();
+        // Upload mesh to GPU
+        const mesh_id = try self.uploadMesh(mesh);
 
-        // Upload truck mesh to GPU
-        self.truck_mesh_id = try self.uploadMesh(truck_mesh);
+        // Store mesh ID
+        const handle = self.mesh_count;
+        self.mesh_ids[handle] = mesh_id;
 
-        // Upload hill mesh to GPU
-        self.hill_mesh_id = try self.uploadMesh(hill_mesh);
+        // Initialize model matrix to identity
+        self.model_matrices[handle] = [_]f32{0} ** 16;
+        identityMatrix(&self.model_matrices[handle].?);
 
-        // Position the hill below the truck
-        translateMatrix(&self.hill_model_matrix, 0.0, -2.0, 0.0);
+        // Set as visible
+        self.is_visible[handle] = true;
 
-        // Position the truck at the start of the hill
-        translateMatrix(&self.truck_model_matrix, 0.0, 0.0, -5.0);
+        // Increment mesh count
+        self.mesh_count += 1;
+
+        return handle;
+    }
+
+    /// Update the model matrix for a mesh
+    pub fn updateModelMatrix(self: *Renderer, handle: u32, position: [3]f32, rotation: [3]f32, scale: [3]f32) void {
+        if (handle >= self.mesh_count or self.model_matrices[handle] == null) {
+            return;
+        }
+
+        // Reset to identity
+        identityMatrix(&self.model_matrices[handle].?);
+
+        // Apply scale
+        scaleMatrix(&self.model_matrices[handle].?, scale[0], scale[1], scale[2]);
+
+        // Apply rotation (simplified - just Y rotation for now)
+        rotateYMatrix(&self.model_matrices[handle].?, rotation[1]);
+
+        // Apply position
+        translateMatrix(&self.model_matrices[handle].?, position[0], position[1], position[2]);
+    }
+
+    /// Set visibility of a mesh
+    pub fn setMeshVisibility(self: *Renderer, handle: u32, visible: bool) void {
+        if (handle < self.mesh_count) {
+            self.is_visible[handle] = visible;
+        }
     }
 
     /// Upload a mesh to the GPU and return its ID
     fn uploadMesh(self: *Renderer, mesh: mesh_mod.Mesh) !u32 {
         // Create vertex buffer
         self.command_buffer.addCreateBufferCommand();
-        const vertex_buffer_id = 1; // In a real implementation, we'd get this from WebGL
+        const vertex_buffer_id: u32 = 1; // In a real implementation, we'd get this from WebGL
 
         // Bind vertex buffer
         self.command_buffer.addBindBufferCommand(GL.ARRAY_BUFFER, vertex_buffer_id);
@@ -359,11 +398,12 @@ pub const Renderer = struct {
         // Update camera view-projection matrix
         self.camera.updateViewMatrix();
 
-        // Render hill
-        self.renderMesh(self.hill_mesh_id, &self.hill_model_matrix);
-
-        // Render truck
-        self.renderMesh(self.truck_mesh_id, &self.truck_model_matrix);
+        // Render all visible meshes
+        for (0..self.mesh_count) |i| {
+            if (self.is_visible[i] and self.model_matrices[i] != null) {
+                self.renderMesh(self.mesh_ids[i], &self.model_matrices[i].?);
+            }
+        }
     }
 
     /// Render a mesh with the given model matrix
@@ -480,7 +520,7 @@ pub const Renderer = struct {
 };
 
 /// Set matrix to identity
-fn identityMatrix(matrix: *[16]f32) void {
+pub fn identityMatrix(matrix: *[16]f32) void {
     matrix[0] = 1.0;
     matrix[1] = 0.0;
     matrix[2] = 0.0;
@@ -502,8 +542,46 @@ fn identityMatrix(matrix: *[16]f32) void {
     matrix[15] = 1.0;
 }
 
+/// Scale matrix by x, y, z
+pub fn scaleMatrix(matrix: *[16]f32, x: f32, y: f32, z: f32) void {
+    matrix[0] *= x;
+    matrix[1] *= x;
+    matrix[2] *= x;
+    matrix[3] *= x;
+
+    matrix[4] *= y;
+    matrix[5] *= y;
+    matrix[6] *= y;
+    matrix[7] *= y;
+
+    matrix[8] *= z;
+    matrix[9] *= z;
+    matrix[10] *= z;
+    matrix[11] *= z;
+}
+
+/// Rotate matrix around Y axis
+pub fn rotateYMatrix(matrix: *[16]f32, angle_radians: f32) void {
+    const c = @cos(angle_radians);
+    const s = @sin(angle_radians);
+
+    const m0 = matrix[0];
+    const m2 = matrix[2];
+    const m4 = matrix[4];
+    const m6 = matrix[6];
+    const m8 = matrix[8];
+    const m10 = matrix[10];
+
+    matrix[0] = m0 * c - m2 * s;
+    matrix[2] = m0 * s + m2 * c;
+    matrix[4] = m4 * c - m6 * s;
+    matrix[6] = m4 * s + m6 * c;
+    matrix[8] = m8 * c - m10 * s;
+    matrix[10] = m8 * s + m10 * c;
+}
+
 /// Translate matrix by x, y, z
-fn translateMatrix(matrix: *[16]f32, x: f32, y: f32, z: f32) void {
+pub fn translateMatrix(matrix: *[16]f32, x: f32, y: f32, z: f32) void {
     matrix[12] = matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12];
     matrix[13] = matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13];
     matrix[14] = matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14];
