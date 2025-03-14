@@ -20,8 +20,8 @@ pub const Camera = struct {
             .projection = [_]f32{0} ** 16,
             .view = [_]f32{0} ** 16,
             .view_projection = [_]f32{0} ** 16,
-            .position = [_]f32{ 0, 5, 10 }, // Position camera above and behind the scene
-            .rotation = [_]f32{ -math.pi / 4.0, 0, math.pi / 4.0 }, // Isometric rotation
+            .position = [_]f32{ 0, 8, 12 }, // Position camera higher and further back
+            .rotation = [_]f32{ -math.pi / 6.0, 0, math.pi / 4.0 }, // Less steep angle for better view
         };
 
         // Initialize with identity matrices
@@ -31,7 +31,7 @@ pub const Camera = struct {
 
         // Set up initial matrices
         camera.updateViewMatrix();
-        camera.setOrthographicProjection(-10, 10, -10, 10, 0.1, 100.0);
+        camera.setOrthographicProjection(-15, 15, -15, 15, 0.1, 100.0); // Wider view frustum
         camera.updateViewProjectionMatrix();
 
         return camera;
@@ -83,6 +83,17 @@ pub const Camera = struct {
     /// Get pointer to the view-projection matrix for shaders
     pub fn getViewProjectionMatrixPtr(self: *Camera) *const [16]f32 {
         return &self.view_projection;
+    }
+
+    /// Update camera to follow a target position
+    pub fn followTarget(self: *Camera, target_position: [3]f32, offset: [3]f32) void {
+        // Update camera position to follow target with offset
+        self.position[0] = target_position[0] + offset[0];
+        self.position[1] = target_position[1] + offset[1];
+        self.position[2] = target_position[2] + offset[2];
+
+        // Update view matrix with new position
+        self.updateViewMatrix();
     }
 };
 

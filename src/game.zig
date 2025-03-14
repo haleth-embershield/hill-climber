@@ -270,6 +270,10 @@ pub const Game = struct {
     }
 
     fn renderGame(self: *Game) void {
+        // Update camera to follow the truck
+        const camera_offset = [_]f32{ -5.0, 8.0, 12.0 }; // Offset for isometric view
+        self.camera.followTarget(self.truck.model.position, camera_offset);
+
         // Clear the screen with sky blue
         self.renderer.beginFrame(.{ 135, 206, 235 });
 
@@ -281,6 +285,11 @@ pub const Game = struct {
     }
 
     fn renderMenu(self: *Game) void {
+        // Position camera for menu view
+        const menu_position = [_]f32{ 0.0, 0.0, -5.0 }; // Default truck position
+        const camera_offset = [_]f32{ -5.0, 8.0, 12.0 }; // Same offset as in game
+        self.camera.followTarget(menu_position, camera_offset);
+
         // Clear the screen with sky blue
         self.renderer.beginFrame(.{ 135, 206, 235 });
 
