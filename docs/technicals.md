@@ -39,6 +39,114 @@ The rendering pipeline follows these steps:
    - Renderer draws all visible meshes with their current model matrices
    - Renderer presents the frame
 
+## Input System
+
+The game uses a unified input system that handles keyboard, mouse, and touch events in a consistent way. The system is designed to be:
+
+1. **Project Agnostic**: The input system is not tied to any specific game mechanics
+2. **Efficient**: Uses bitsets for state tracking
+3. **Cross-Platform**: Handles both desktop and mobile input methods
+4. **Type-Safe**: Uses enums for key codes and actions
+
+### Input Architecture
+
+The input system consists of these main components:
+
+1. **KeyCode Enum** (`input.zig`):
+   - Maps all possible input sources to unique codes
+   - Includes keyboard keys (A-Z, 0-9, arrows, etc.)
+   - Mouse buttons (Left, Middle, Right, Back, Forward)
+   - Touch events (Primary, Secondary)
+
+```zig
+pub const KeyCode = enum(u8) {
+    // Arrow keys
+    ArrowRight = 39,
+    ArrowLeft = 37,
+    // ... more key definitions ...
+    
+    // Mouse buttons (200-204)
+    MouseLeft = 200,
+    MouseRight = 202,
+    
+    // Touch events (210-211)
+    TouchPrimary = 210,
+    TouchSecondary = 211,
+};
+```
+
+2. **Input State Tracking** (`input.zig`):
+   - Uses `std.bit_set.IntegerBitSet(256)` for efficient state tracking
+   - Tracks current pointer position and movement deltas
+   - Maintains scroll wheel state
+
+```zig
+pub const InputState = struct {
+    key_states: std.bit_set.IntegerBitSet(256),
+    pointer: PointerData,
+    
+    pub fn isKeyPressed(self: *const InputState, key: KeyCode) bool {
+        return self.key_states.isSet(@intFromEnum(key));
+    }
+};
+```
+
+3. **Input Actions** (`input.zig`):
+   - Defines possible input actions (Press, Release, Move, Scroll)
+   - Used to communicate input state changes
+
+```zig
+pub const InputAction = enum(u8) {
+    Press,
+    Release,
+    Move,
+    Scroll,
+};
+```
+
+### Input Flow
+
+1. **JavaScript Event Handling** (`web/main.js`):
+   - Captures raw browser events (keydown, mousedown, touchstart, etc.)
+   - Translates browser events to our custom key codes
+   - Calls appropriate WASM functions with normalized data
+
+2. **WASM Input Processing** (`main.zig`):
+   - Receives normalized input events from JavaScript
+   - Routes input to the game's input handler
+
+3. **Game Input Handling** (`game.zig`):
+   - Updates input state based on received events
+   - Processes input based on current game state
+   - Maps input to game actions
+
+### Example Usage
+
+```zig
+// Check for keyboard input
+if (input_state.isKeyPressed(.ArrowRight) or input_state.isKeyPressed(.KeyD)) {
+    // Move right
+}
+
+// Handle mouse/touch position
+const pointer = input_state.getPointerPosition();
+const mouse_x = pointer.x;
+const mouse_y = pointer.y;
+
+// Check for mouse buttons
+if (input_state.isKeyPressed(.MouseLeft)) {
+    // Handle left click
+}
+```
+
+### Design Benefits
+
+1. **Unified Interface**: All input types (keyboard, mouse, touch) are handled through the same interface
+2. **State Management**: Efficient tracking of input states using bitsets
+3. **Type Safety**: Enum-based key codes prevent errors from invalid key values
+4. **Platform Independence**: Input system works the same way regardless of input method
+5. **Easy Extension**: New input types can be added by extending the KeyCode enum
+
 ## Component Responsibilities
 
 ### Game (game.zig)

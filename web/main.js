@@ -456,7 +456,139 @@ async function initWasm() {
         startButton.addEventListener('click', startGame);
         pauseButton.addEventListener('click', togglePause);
         primaryActionButton.addEventListener('click', handlePrimaryAction);
-        
+
+        // Mouse event listeners
+        gameCanvas.addEventListener('mousemove', (event) => {
+            if (!wasmModule) return;
+            
+            const rect = gameCanvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            wasmModule.handlePointerMove(x, y);
+        });
+
+        gameCanvas.addEventListener('mousedown', (event) => {
+            if (!wasmModule) return;
+            event.preventDefault();
+            
+            const rect = gameCanvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            
+            // Map mouse button to our custom codes
+            let buttonCode = null;
+            switch(event.button) {
+                case 0: // Left
+                    buttonCode = 200; // MouseLeft
+                    break;
+                case 1: // Middle
+                    buttonCode = 201; // MouseMiddle
+                    break;
+                case 2: // Right
+                    buttonCode = 202; // MouseRight
+                    break;
+                case 3: // Back
+                    buttonCode = 203; // MouseBack
+                    break;
+                case 4: // Forward
+                    buttonCode = 204; // MouseForward
+                    break;
+            }
+            
+            if (buttonCode !== null) {
+                wasmModule.handlePointerAction(buttonCode, true, x, y);
+            }
+        });
+
+        gameCanvas.addEventListener('mouseup', (event) => {
+            if (!wasmModule) return;
+            event.preventDefault();
+            
+            const rect = gameCanvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            
+            // Map mouse button to our custom codes
+            let buttonCode = null;
+            switch(event.button) {
+                case 0: // Left
+                    buttonCode = 200; // MouseLeft
+                    break;
+                case 1: // Middle
+                    buttonCode = 201; // MouseMiddle
+                    break;
+                case 2: // Right
+                    buttonCode = 202; // MouseRight
+                    break;
+                case 3: // Back
+                    buttonCode = 203; // MouseBack
+                    break;
+                case 4: // Forward
+                    buttonCode = 204; // MouseForward
+                    break;
+            }
+            
+            if (buttonCode !== null) {
+                wasmModule.handlePointerAction(buttonCode, false, x, y);
+            }
+        });
+
+        // Prevent context menu on right click
+        gameCanvas.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+        });
+
+        // Mouse wheel support
+        gameCanvas.addEventListener('wheel', (event) => {
+            if (!wasmModule) return;
+            event.preventDefault();
+            
+            // Normalize scroll values
+            const scrollX = event.deltaX / 100;
+            const scrollY = event.deltaY / 100;
+            wasmModule.handleScroll(scrollX, scrollY);
+        });
+
+        // Touch event support
+        gameCanvas.addEventListener('touchstart', (event) => {
+            if (!wasmModule) return;
+            event.preventDefault();
+            
+            const rect = gameCanvas.getBoundingClientRect();
+            const touch = event.touches[0];
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            
+            // Use 210 for primary touch (matches our TouchPrimary code)
+            wasmModule.handlePointerAction(210, true, x, y);
+            wasmModule.handlePointerMove(x, y);
+        });
+
+        gameCanvas.addEventListener('touchmove', (event) => {
+            if (!wasmModule) return;
+            event.preventDefault();
+            
+            const rect = gameCanvas.getBoundingClientRect();
+            const touch = event.touches[0];
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            
+            wasmModule.handlePointerMove(x, y);
+        });
+
+        gameCanvas.addEventListener('touchend', (event) => {
+            if (!wasmModule) return;
+            event.preventDefault();
+            
+            const rect = gameCanvas.getBoundingClientRect();
+            // Use last known position since touches array will be empty
+            const x = event.changedTouches[0].clientX - rect.left;
+            const y = event.changedTouches[0].clientY - rect.top;
+            
+            // Use 210 for primary touch (matches our TouchPrimary code)
+            wasmModule.handlePointerAction(210, false, x, y);
+        });
+
         // Add keyboard event listener
         window.addEventListener('keydown', (event) => {
             if (!wasmModule) return;
@@ -571,12 +703,6 @@ async function initWasm() {
                 event.preventDefault();
                 wasmModule.handleInput(keyCode, false);
             }
-        });
-        
-        // Touch events for mobile
-        primaryActionButton.addEventListener('touchstart', (event) => {
-            event.preventDefault();
-            handlePrimaryAction();
         });
         
         // Start the game loop

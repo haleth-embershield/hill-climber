@@ -337,6 +337,58 @@ pub const Game = struct {
         }
     }
 
+    /// Handle pointer (mouse/touch) movement
+    pub fn handlePointerMove(self: *Game, x: f32, y: f32) void {
+        self.input_state.updatePointer(x, y);
+    }
+
+    /// Handle pointer (mouse/touch) input events
+    pub fn handlePointerInput(self: *Game, key: input.KeyCode, action: input.InputAction, x: f32, y: f32) void {
+        // Update pointer position
+        self.input_state.updatePointer(x, y);
+
+        // Update input state for the button/touch
+        self.input_state.setKeyState(key, action == .Press);
+
+        // Handle specific pointer actions based on game state
+        if (action == .Press) {
+            switch (self.state) {
+                .Menu => {
+                    // Handle menu selection
+                    if (key == .MouseLeft or key == .TouchPrimary) {
+                        self.handleMenuClick(x, y);
+                    }
+                },
+                .GameOver => {
+                    // Restart game on click when game over
+                    if (key == .MouseLeft or key == .TouchPrimary) {
+                        _ = self.reset(self.alloc) catch {};
+                    }
+                },
+                else => {},
+            }
+        }
+    }
+
+    /// Handle scroll wheel input
+    pub fn handleScroll(self: *Game, x: f32, y: f32) void {
+        self.input_state.updateScroll(x, y);
+    }
+
+    /// Handle menu click/touch
+    fn handleMenuClick(self: *Game, x: f32, y: f32) void {
+        // TODO: Implement real menu click handling when a menu is implemented *in* webgl (not html)
+        // Basic menu hit testing
+        if (y < @as(f32, @floatFromInt(self.height)) / 2.0) {
+            // Start game when clicking upper half
+            _ = self.reset(self.alloc) catch {};
+        }
+        if (x < @as(f32, @floatFromInt(self.width)) / 2.0) {
+            // Start game when clicking right half
+            _ = self.reset(self.alloc) catch {};
+        }
+    }
+
     pub fn togglePause(self: *Game) void {
         if (self.state == GameState.Playing) {
             self.state = GameState.Paused;

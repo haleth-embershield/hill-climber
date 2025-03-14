@@ -47,7 +47,7 @@ export fn update(delta_time: f32) void {
     game.update(delta_time);
 }
 
-// Unified input handler
+// Unified input handler for keyboard, mouse, and touch events
 export fn handleInput(key_code: u8, is_press: bool) void {
     if (input.KeyCode.fromU8(key_code)) |key| {
         const action: input.InputAction = if (is_press) .Press else .Release;
@@ -55,10 +55,24 @@ export fn handleInput(key_code: u8, is_press: bool) void {
     }
 }
 
-// Handle mouse click
-export fn handleClick(x_pos: f32, y_pos: f32) void {
-    _ = x_pos;
-    _ = y_pos;
+// Handle pointer (mouse/touch) movement
+export fn handlePointerMove(x: f32, y: f32) void {
+    game.handlePointerMove(x, y);
+}
+
+// Handle pointer (mouse/touch) action
+export fn handlePointerAction(button: u8, is_press: bool, x: f32, y: f32) void {
+    if (input.KeyCode.fromU8(button)) |key| {
+        if (key.isMouseButton() or key.isTouchEvent()) {
+            const action: input.InputAction = if (is_press) .Press else .Release;
+            game.handlePointerInput(key, action, x, y);
+        }
+    }
+}
+
+// Handle scroll wheel
+export fn handleScroll(x: f32, y: f32) void {
+    game.handleScroll(x, y);
 }
 
 // Clean up resources when the module is unloaded
