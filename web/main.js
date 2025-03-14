@@ -198,6 +198,24 @@ const imports = {
         },
         executeBatchedCommands: (cmdPtr, width, height) => {
             window.WebGLInterface.executeBatch(cmdPtr, width, height, wasmModule.memory);
+        },
+        createShader: (type, sourcePtr, sourceLen) => {
+            const buffer = new Uint8Array(wasmModule.memory.buffer);
+            const source = new TextDecoder().decode(buffer.subarray(sourcePtr, sourcePtr + sourceLen));
+            return window.WebGLInterface.createShader(type, source);
+        },
+        createProgram: (vertexShaderId, fragmentShaderId) => {
+            return window.WebGLInterface.createProgram(vertexShaderId, fragmentShaderId);
+        },
+        getUniformLocation: (programId, namePtr, nameLen) => {
+            const buffer = new Uint8Array(wasmModule.memory.buffer);
+            const name = new TextDecoder().decode(buffer.subarray(namePtr, namePtr + nameLen));
+            return window.WebGLInterface.getUniformLocation(programId, name);
+        },
+        getAttribLocation: (programId, namePtr, nameLen) => {
+            const buffer = new Uint8Array(wasmModule.memory.buffer);
+            const name = new TextDecoder().decode(buffer.subarray(namePtr, namePtr + nameLen));
+            return window.WebGLInterface.getAttribLocation(programId, name);
         }
     }
 };

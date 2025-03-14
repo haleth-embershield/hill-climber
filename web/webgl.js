@@ -5,6 +5,14 @@ let gl = null;
 let texture = null;
 let shaderProgram = null;
 let vertexBuffer = null;
+let indexBuffer = null;
+
+// Store resources by ID for reference
+const glResources = {
+    buffers: {},
+    shaders: {},
+    programs: {}
+};
 
 // Check if WebGL is supported by the browser
 function isWebGLSupported() {
@@ -150,7 +158,7 @@ function renderFrame(textureData, width, height) {
 
 // Execute batched WebGL commands
 function executeBatchedCommands(commandBuffer, width, height, zigMemory) {
-    if (!gl || !texture) {
+    if (!gl) {
         console.error('WebGL not initialized');
         return false;
     }
@@ -184,6 +192,114 @@ function executeBatchedCommands(commandBuffer, width, height, zigMemory) {
                 gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
                 break;
                 
+            case 3: // CreateBuffer
+                const bufferId = Object.keys(glResources.buffers).length + 1; // Simple id generation
+                glResources.buffers[bufferId] = gl.createBuffer();
+                break;
+                
+            case 4: // BindBuffer
+                const bufferType = commandData[cmdIndex + 1];
+                const bufferIdToBind = commandData[cmdIndex + 2];
+                gl.bindBuffer(bufferType, glResources.buffers[bufferIdToBind]);
+                break;
+                
+            case 5: // BufferData
+                const bufferTypeForData = commandData[cmdIndex + 1];
+                const dataPointer = commandData[cmdIndex + 2];
+                const dataSize = commandData[cmdIndex + 3];
+                const bufferData = new Uint8Array(zigMemory.buffer, dataPointer, dataSize);
+                gl.bufferData(bufferTypeForData, bufferData, gl.STATIC_DRAW);
+                break;
+                
+            case 6: // CreateShader
+                // Not implemented in this simplified version
+                break;
+                
+            case 7: // CreateProgram
+                // Not implemented in this simplified version
+                break;
+                
+            case 8: // UseProgram
+                const programId = commandData[cmdIndex + 1];
+                gl.useProgram(glResources.programs[programId] || shaderProgram);
+                break;
+                
+            case 9: // VertexAttribPointer
+                const attrIndex = commandData[cmdIndex + 1];
+                const size = commandData[cmdIndex + 2];
+                const packedParams = commandData[cmdIndex + 3];
+                const dataType = packedParams & 0xFFFF;
+                const normalized = ((packedParams >> 16) & 0x1) === 1;
+                const stride = (packedParams >> 17) & 0x7F;
+                const offset = (packedParams >> 24);
+                
+                gl.vertexAttribPointer(attrIndex, size, dataType, normalized, stride, offset);
+                break;
+                
+            case 10: // EnableVertexAttribArray
+                const attrIndexEnable = commandData[cmdIndex + 1];
+                gl.enableVertexAttribArray(attrIndexEnable);
+                break;
+                
+            case 11: // DrawElements
+                const mode = commandData[cmdIndex + 1];
+                const count = commandData[cmdIndex + 2];
+                const packedDrawParams = commandData[cmdIndex + 3];
+                const drawType = packedDrawParams & 0xFFFF;
+                const drawOffset = (packedDrawParams >> 16) * 2; // Offset in bytes for index buffer
+                
+                gl.drawElements(mode, count, drawType, drawOffset);
+                break;
+                
+            case 12: // UniformMatrix4fv
+                const matLocation = commandData[cmdIndex + 1];
+                const matrixPtr = commandData[cmdIndex + 2];
+                const matrixData = new Float32Array(zigMemory.buffer, matrixPtr, 16);
+                
+                gl.uniformMatrix4fv(matLocation, false, matrixData);
+                break;
+                
+            case 13: // Uniform3f
+                const vec3Location = commandData[cmdIndex + 1];
+                const xScaled = commandData[cmdIndex + 2];
+                const packedYZ = commandData[cmdIndex + 3];
+                
+                // Convert back from scaled integers to floats
+                const x = xScaled / 1000.0;
+                const y = ((packedYZ >> 16) & 0xFFFF) / 1000.0;
+                const z = (packedYZ & 0xFFFF) / 1000.0;
+                
+                gl.uniform3f(vec3Location, x, y, z);
+                break;
+                
+            case 14: // Uniform4f
+                const vec4Location = commandData[cmdIndex + 1];
+                const xVal = commandData[cmdIndex + 2] / 1000.0;
+                const yVal = commandData[cmdIndex + 3] / 1000.0;
+                // Note: z and w values are not properly handled in this simplified version
+                
+                gl.uniform4f(vec4Location, xVal, yVal, 0.0, 1.0);
+                break;
+                
+            case 15: // EnableDepthTest
+                gl.enable(gl.DEPTH_TEST);
+                break;
+                
+            case 16: // Clear
+                const clearBits = commandData[cmdIndex + 1];
+                let clearMask = 0;
+                
+                if ((clearBits & 0x2) !== 0) {
+                    clearMask |= gl.COLOR_BUFFER_BIT;
+                }
+                
+                if ((clearBits & 0x1) !== 0) {
+                    clearMask |= gl.DEPTH_BUFFER_BIT;
+                }
+                
+                gl.clear(clearMask);
+                break;
+                
             default:
                 console.error('Unknown WebGL command:', opcode);
                 break;
@@ -200,16 +316,130 @@ function clearCanvas() {
         return;
     }
 
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+}
+
+// Helper to extract float values from WebGL commands
+function extractFloat(value) {
+    const buffer = new ArrayBuffer(4);
+    const view = new DataView(buffer);
+    view.setUint32(0, value, true);
+    return view.getFloat32(0, true);
 }
 
 // Define WebGL constants for use in JavaScript
 const GL_CONSTANTS = {
-    GL_TEXTURE_2D: 0x0DE1,
-    GL_RGB: 0x1907,
+    // Buffer types
+    GL_ARRAY_BUFFER: 0x8892,
+    GL_ELEMENT_ARRAY_BUFFER: 0x8893,
+    
+    // Drawing modes
+    GL_POINTS: 0x0000,
+    GL_LINES: 0x0001,
+    GL_TRIANGLES: 0x0004,
+    GL_TRIANGLE_STRIP: 0x0005,
+    
+    // Data types
     GL_UNSIGNED_BYTE: 0x1401,
-    GL_TRIANGLE_STRIP: 0x0005
+    GL_UNSIGNED_SHORT: 0x1403,
+    GL_FLOAT: 0x1406,
+    
+    // Usage hints
+    GL_STATIC_DRAW: 0x88E4,
+    GL_DYNAMIC_DRAW: 0x88E8,
+    
+    // Clear bits
+    GL_COLOR_BUFFER_BIT: 0x4000,
+    GL_DEPTH_BUFFER_BIT: 0x0100
 };
+
+// Create a shader with the given source
+function createShaderForWasm(shaderType, shaderSource) {
+    if (!gl) {
+        console.error('WebGL not initialized');
+        return 0;
+    }
+    
+    const shader = gl.createShader(shaderType);
+    gl.shaderSource(shader, shaderSource);
+    gl.compileShader(shader);
+    
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error('Shader compile error:', gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return 0;
+    }
+    
+    // Store in resources
+    const shaderId = Object.keys(glResources.shaders).length + 1;
+    glResources.shaders[shaderId] = shader;
+    return shaderId;
+}
+
+// Create a program from two shaders
+function createProgramForWasm(vertexShaderId, fragmentShaderId) {
+    if (!gl) {
+        console.error('WebGL not initialized');
+        return 0;
+    }
+    
+    const vertexShader = glResources.shaders[vertexShaderId];
+    const fragmentShader = glResources.shaders[fragmentShaderId];
+    
+    if (!vertexShader || !fragmentShader) {
+        console.error('Invalid shader IDs:', vertexShaderId, fragmentShaderId);
+        return 0;
+    }
+    
+    const program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+    
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error('Program link error:', gl.getProgramInfoLog(program));
+        gl.deleteProgram(program);
+        return 0;
+    }
+    
+    // Store in resources
+    const programId = Object.keys(glResources.programs).length + 1;
+    glResources.programs[programId] = program;
+    return programId;
+}
+
+// Get uniform location
+function getUniformLocationForWasm(programId, uniformName) {
+    if (!gl) {
+        console.error('WebGL not initialized');
+        return -1;
+    }
+    
+    const program = glResources.programs[programId];
+    if (!program) {
+        console.error('Invalid program ID:', programId);
+        return -1;
+    }
+    
+    const location = gl.getUniformLocation(program, uniformName);
+    return location ? 1 : -1; // Simple ID system for demo, in real code you'd map these
+}
+
+// Get attribute location
+function getAttribLocationForWasm(programId, attribName) {
+    if (!gl) {
+        console.error('WebGL not initialized');
+        return -1;
+    }
+    
+    const program = glResources.programs[programId];
+    if (!program) {
+        console.error('Invalid program ID:', programId);
+        return -1;
+    }
+    
+    return gl.getAttribLocation(program, attribName);
+}
 
 // Export the WebGL interface
 window.WebGLInterface = {
@@ -218,9 +448,22 @@ window.WebGLInterface = {
     executeBatch: executeBatchedCommands,
     clearCanvas: clearCanvas,
     isSupported: isWebGLSupported,
+    createShader: createShaderForWasm,
+    createProgram: createProgramForWasm,
+    getUniformLocation: getUniformLocationForWasm,
+    getAttribLocation: getAttribLocationForWasm,
     // Export WebGL constants
-    GL_TEXTURE_2D: GL_CONSTANTS.GL_TEXTURE_2D,
-    GL_RGB: GL_CONSTANTS.GL_RGB,
+    GL_ARRAY_BUFFER: GL_CONSTANTS.GL_ARRAY_BUFFER,
+    GL_ELEMENT_ARRAY_BUFFER: GL_CONSTANTS.GL_ELEMENT_ARRAY_BUFFER,
+    GL_POINTS: GL_CONSTANTS.GL_POINTS,
+    GL_LINES: GL_CONSTANTS.GL_LINES,
+    GL_TRIANGLES: GL_CONSTANTS.GL_TRIANGLES,
+    GL_TRIANGLE_STRIP: GL_CONSTANTS.GL_TRIANGLE_STRIP,
     GL_UNSIGNED_BYTE: GL_CONSTANTS.GL_UNSIGNED_BYTE,
-    GL_TRIANGLE_STRIP: GL_CONSTANTS.GL_TRIANGLE_STRIP
-}; 
+    GL_UNSIGNED_SHORT: GL_CONSTANTS.GL_UNSIGNED_SHORT,
+    GL_FLOAT: GL_CONSTANTS.GL_FLOAT,
+    GL_STATIC_DRAW: GL_CONSTANTS.GL_STATIC_DRAW,
+    GL_DYNAMIC_DRAW: GL_CONSTANTS.GL_DYNAMIC_DRAW,
+    GL_COLOR_BUFFER_BIT: GL_CONSTANTS.GL_COLOR_BUFFER_BIT,
+    GL_DEPTH_BUFFER_BIT: GL_CONSTANTS.GL_DEPTH_BUFFER_BIT
+};
