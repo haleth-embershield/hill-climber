@@ -4,6 +4,7 @@ const renderer = @import("renderer/core.zig");
 const audio = @import("audio.zig");
 const camera = @import("renderer/camera.zig");
 const mesh = @import("renderer/mesh.zig");
+const input = @import("input.zig");
 
 // Game state enum
 pub const GameState = enum {
@@ -30,10 +31,7 @@ pub const Game = struct {
     gameover_render_timer: f32,
     victory_render_timer: f32,
     // Input state
-    right_key_pressed: bool,
-    left_key_pressed: bool,
-    up_key_pressed: bool,
-    down_key_pressed: bool,
+    input_state: input.InputState,
     // Audio state
     is_muted: bool,
     alloc: std.mem.Allocator,
@@ -105,10 +103,7 @@ pub const Game = struct {
             .pause_render_timer = 0,
             .gameover_render_timer = 0,
             .victory_render_timer = 0,
-            .right_key_pressed = false,
-            .left_key_pressed = false,
-            .up_key_pressed = false,
-            .down_key_pressed = false,
+            .input_state = input.InputState.init(),
             .is_muted = false,
             .truck = truck_instance,
             .terrain = terrain,
@@ -149,10 +144,7 @@ pub const Game = struct {
         self.victory_render_timer = 0;
 
         // Reset input state
-        self.right_key_pressed = false;
-        self.left_key_pressed = false;
-        self.up_key_pressed = false;
-        self.down_key_pressed = false;
+        self.input_state.reset();
     }
 
     pub fn update(self: *Game, delta_time: f32) void {
@@ -198,7 +190,12 @@ pub const Game = struct {
         }
 
         // Handle input for truck movement
-        if (self.right_key_pressed) {
+        const right_pressed = self.input_state.isKeyPressed(.ArrowRight) or self.input_state.isKeyPressed(.KeyD);
+        const left_pressed = self.input_state.isKeyPressed(.ArrowLeft) or self.input_state.isKeyPressed(.KeyA);
+        const up_pressed = self.input_state.isKeyPressed(.ArrowUp) or self.input_state.isKeyPressed(.KeyW);
+        const down_pressed = self.input_state.isKeyPressed(.ArrowDown) or self.input_state.isKeyPressed(.KeyS);
+
+        if (right_pressed) {
             // Accelerate forward
             const forward_dir = [_]f32{ 1.0, 0.0, 0.0 };
             self.truck.accelerate(forward_dir, models.truck_ACCELERATION, capped_delta);
@@ -206,7 +203,7 @@ pub const Game = struct {
             // Make sure camera follows immediately when accelerating
             const camera_offset = [_]f32{ 14.43, 14.43, 14.43 };
             self.camera.followTarget(self.truck.model.position, camera_offset);
-        } else if (self.left_key_pressed) {
+        } else if (left_pressed) {
             // Apply brakes
             self.truck.velocity[0] *= 0.95;
         } else {
@@ -215,13 +212,13 @@ pub const Game = struct {
         }
 
         // Handle tilt controls
-        if (self.up_key_pressed) {
+        if (up_pressed) {
             // Tilt truck backward (wheelie)
             self.truck.model.rotation[0] = -30.0;
-        } else if (self.down_key_pressed) {
+        } else if (down_pressed) {
             // Tilt truck forward
             self.truck.model.rotation[0] = 30.0;
-        } else if (!self.up_key_pressed and !self.down_key_pressed) {
+        } else if (!up_pressed and !down_pressed) {
             // Return to neutral tilt gradually
             self.truck.model.rotation[0] *= 0.8;
         }
@@ -313,45 +310,31 @@ pub const Game = struct {
         self.renderer.endFrame();
     }
 
-    // Input handlers for directional controls
-    pub fn handleRightKeyDown(self: *Game) void {
-        if (self.state == GameState.Playing) {
-            self.right_key_pressed = true;
+    /// Handle input events from JavaScript
+    pub fn handleInput(self: *Game, key: input.KeyCode, action: input.InputAction) void {
+        // Update input state
+        self.input_state.setKeyState(key, action == .Press);
+
+        // Handle special keys that trigger immediate actions
+        if (action == .Press) {
+            switch (key) {
+                .KeyR => {
+                    _ = self.reset(self.alloc) catch {};
+                },
+                .KeyP => {
+                    self.togglePause();
+                },
+                .KeyM => {
+                    self.toggleMute();
+                },
+                .Space => {
+                    if (self.state == .GameOver) {
+                        _ = self.reset(self.alloc) catch {};
+                    }
+                },
+                else => {},
+            }
         }
-    }
-
-    pub fn handleRightKeyUp(self: *Game) void {
-        self.right_key_pressed = false;
-    }
-
-    pub fn handleLeftKeyDown(self: *Game) void {
-        if (self.state == GameState.Playing) {
-            self.left_key_pressed = true;
-        }
-    }
-
-    pub fn handleLeftKeyUp(self: *Game) void {
-        self.left_key_pressed = false;
-    }
-
-    pub fn handleUpKeyDown(self: *Game) void {
-        if (self.state == GameState.Playing) {
-            self.up_key_pressed = true;
-        }
-    }
-
-    pub fn handleUpKeyUp(self: *Game) void {
-        self.up_key_pressed = false;
-    }
-
-    pub fn handleDownKeyDown(self: *Game) void {
-        if (self.state == GameState.Playing) {
-            self.down_key_pressed = true;
-        }
-    }
-
-    pub fn handleDownKeyUp(self: *Game) void {
-        self.down_key_pressed = false;
     }
 
     pub fn togglePause(self: *Game) void {

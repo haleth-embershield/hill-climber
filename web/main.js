@@ -461,60 +461,57 @@ async function initWasm() {
         window.addEventListener('keydown', (event) => {
             if (!wasmModule) return;
             
+            // Map key to keycode
+            let keyCode = null;
             switch(event.key) {
-                case ' ': // Space bar
-                    event.preventDefault();
-                    handlePrimaryAction();
+                case 'ArrowRight':
+                    keyCode = 39; // ArrowRight
                     break;
-                case 'p': // P key
-                case 'P':
-                    event.preventDefault();
-                    togglePause();
+                case 'ArrowLeft':
+                    keyCode = 37; // ArrowLeft
                     break;
-                case 'm': // M key
-                case 'M':
-                    event.preventDefault();
-                    if (typeof wasmModule.toggleMute === 'function') {
-                        wasmModule.toggleMute();
-                    }
+                case 'ArrowUp':
+                    keyCode = 38; // ArrowUp
                     break;
-                case 'r': // R key
-                case 'R':
-                    event.preventDefault();
-                    if (typeof wasmModule.handleResetKey === 'function') {
-                        wasmModule.handleResetKey();
-                        // Hide game over message when resetting
-                        gameStateMessage.classList.remove('visible');
-                    }
+                case 'ArrowDown':
+                    keyCode = 40; // ArrowDown
                     break;
-                case 'ArrowRight': // Right arrow
                 case 'd':
                 case 'D':
-                    if (typeof wasmModule.handleRightKeyDown === 'function') {
-                        wasmModule.handleRightKeyDown();
-                    }
+                    keyCode = 68; // KeyD
                     break;
-                case 'ArrowLeft': // Left arrow
                 case 'a':
                 case 'A':
-                    if (typeof wasmModule.handleLeftKeyDown === 'function') {
-                        wasmModule.handleLeftKeyDown();
-                    }
+                    keyCode = 65; // KeyA
                     break;
-                case 'ArrowUp': // Up arrow
                 case 'w':
                 case 'W':
-                    if (typeof wasmModule.handleUpKeyDown === 'function') {
-                        wasmModule.handleUpKeyDown();
-                    }
+                    keyCode = 87; // KeyW
                     break;
-                case 'ArrowDown': // Down arrow
                 case 's':
                 case 'S':
-                    if (typeof wasmModule.handleDownKeyDown === 'function') {
-                        wasmModule.handleDownKeyDown();
-                    }
+                    keyCode = 83; // KeyS
                     break;
+                case 'r':
+                case 'R':
+                    keyCode = 82; // KeyR
+                    break;
+                case 'p':
+                case 'P':
+                    keyCode = 80; // KeyP
+                    break;
+                case 'm':
+                case 'M':
+                    keyCode = 77; // KeyM
+                    break;
+                case ' ':
+                    keyCode = 32; // Space
+                    break;
+            }
+            
+            if (keyCode !== null) {
+                event.preventDefault();
+                wasmModule.handleInput(keyCode, true);
             }
         });
         
@@ -522,35 +519,57 @@ async function initWasm() {
         window.addEventListener('keyup', (event) => {
             if (!wasmModule) return;
             
+            // Map key to keycode
+            let keyCode = null;
             switch(event.key) {
-                case 'ArrowRight': // Right arrow
+                case 'ArrowRight':
+                    keyCode = 39; // ArrowRight
+                    break;
+                case 'ArrowLeft':
+                    keyCode = 37; // ArrowLeft
+                    break;
+                case 'ArrowUp':
+                    keyCode = 38; // ArrowUp
+                    break;
+                case 'ArrowDown':
+                    keyCode = 40; // ArrowDown
+                    break;
                 case 'd':
                 case 'D':
-                    if (typeof wasmModule.handleRightKeyUp === 'function') {
-                        wasmModule.handleRightKeyUp();
-                    }
+                    keyCode = 68; // KeyD
                     break;
-                case 'ArrowLeft': // Left arrow
                 case 'a':
                 case 'A':
-                    if (typeof wasmModule.handleLeftKeyUp === 'function') {
-                        wasmModule.handleLeftKeyUp();
-                    }
+                    keyCode = 65; // KeyA
                     break;
-                case 'ArrowUp': // Up arrow
                 case 'w':
                 case 'W':
-                    if (typeof wasmModule.handleUpKeyUp === 'function') {
-                        wasmModule.handleUpKeyUp();
-                    }
+                    keyCode = 87; // KeyW
                     break;
-                case 'ArrowDown': // Down arrow
                 case 's':
                 case 'S':
-                    if (typeof wasmModule.handleDownKeyUp === 'function') {
-                        wasmModule.handleDownKeyUp();
-                    }
+                    keyCode = 83; // KeyS
                     break;
+                case 'r':
+                case 'R':
+                    keyCode = 82; // KeyR
+                    break;
+                case 'p':
+                case 'P':
+                    keyCode = 80; // KeyP
+                    break;
+                case 'm':
+                case 'M':
+                    keyCode = 77; // KeyM
+                    break;
+                case ' ':
+                    keyCode = 32; // Space
+                    break;
+            }
+            
+            if (keyCode !== null) {
+                event.preventDefault();
+                wasmModule.handleInput(keyCode, false);
             }
         });
         

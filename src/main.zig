@@ -5,6 +5,7 @@ const game_mod = @import("game.zig");
 const models = @import("models.zig");
 const renderer = @import("renderer/core.zig");
 const audio = @import("audio.zig");
+const input = @import("input.zig");
 
 // WASM imports for browser interaction
 extern "env" fn consoleLog(ptr: [*]const u8, len: usize) void;
@@ -46,65 +47,12 @@ export fn update(delta_time: f32) void {
     game.update(delta_time);
 }
 
-// Handle right key down (d key or right arrow)
-export fn handleRightKeyDown() void {
-    game.handleRightKeyDown();
-}
-
-// Handle right key up
-export fn handleRightKeyUp() void {
-    game.handleRightKeyUp();
-}
-
-// Handle up key down (w key or up arrow)
-export fn handleUpKeyDown() void {
-    game.handleUpKeyDown();
-}
-
-// Handle up key up
-export fn handleUpKeyUp() void {
-    game.handleUpKeyUp();
-}
-
-// Handle down key down (s key or down arrow)
-export fn handleDownKeyDown() void {
-    game.handleDownKeyDown();
-}
-
-// Handle down key up
-export fn handleDownKeyUp() void {
-    game.handleDownKeyUp();
-}
-
-// Handle left key down (a key or left arrow)
-export fn handleLeftKeyDown() void {
-    game.handleLeftKeyDown();
-}
-
-// Handle left key up
-export fn handleLeftKeyUp() void {
-    game.handleLeftKeyUp();
-}
-
-// Handle reset key (R)
-export fn handleResetKey() void {
-    _ = game.reset(allocator) catch {
-        logString("Failed to reset game");
-        return;
-    };
-    logString("Game reset with R key");
-}
-
-// Handle pause key (P)
-export fn togglePause() void {
-    game.togglePause();
-    logString("Game pause toggled");
-}
-
-// Handle mute key (M)
-export fn toggleMute() void {
-    game.toggleMute();
-    logString("Audio mute toggled");
+// Unified input handler
+export fn handleInput(key_code: u8, is_press: bool) void {
+    if (input.KeyCode.fromU8(key_code)) |key| {
+        const action: input.InputAction = if (is_press) .Press else .Release;
+        game.handleInput(key, action);
+    }
 }
 
 // Handle mouse click
