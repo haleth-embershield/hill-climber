@@ -41,7 +41,7 @@ pub fn build(b: *std.Build) void {
     make_dist.step.dependOn(b.getInstallStep());
 
     // Create a step to copy the WASM file to the root dist directory
-    const copy_wasm = b.addInstallFile(exe.getEmittedBin(), "../dist/flapper.wasm");
+    const copy_wasm = b.addInstallFile(exe.getEmittedBin(), "../dist/game.wasm");
     copy_wasm.step.dependOn(b.getInstallStep());
     copy_wasm.step.dependOn(&make_dist.step);
 

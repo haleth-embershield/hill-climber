@@ -1,0 +1,313 @@
+body {
+    font-family: 'Courier New', monospace;
+    margin: 0;
+    padding: 20px;
+    background-color: #1a1a1a;
+    color: #c0c0c0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+.container {
+    background-color: #0a0a0a;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(100, 100, 100, 0.5);
+    max-width: 100%;
+    width: 95%;
+    margin: 0 auto;
+    text-align: center;
+    border: 1px solid #444;
+    box-sizing: border-box;
+}
+
+h1 {
+    color: #d0d0d0;
+    margin-top: 0;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 2px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    font-size: clamp(1.5rem, 4vw, 2.5rem);
+}
+
+canvas {
+    border: 1px solid #444;
+    background-color: #000;
+    margin: 20px auto;
+    display: block;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    max-width: 100%;
+    height: auto;
+}
+
+.status {
+    margin-top: 10px;
+    color: #a0a0a0;
+    font-size: 0.9rem;
+}
+
+.score-display {
+    font-size: 24px;
+    color: #d0d0d0;
+    margin: 10px 0;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 1px;
+}
+
+.high-score {
+    font-size: 18px;
+    color: #a0a0a0;
+    margin-bottom: 15px;
+    font-family: 'Courier New', monospace;
+}
+
+.log-container {
+    margin-top: 10px;
+    border: 1px solid #444;
+    padding: 10px;
+    height: 150px;
+    overflow-y: auto;
+    text-align: left;
+    font-family: 'Courier New', monospace;
+    background-color: #0a0a0a;
+    color: #a0a0a0;
+    transition: height 0.3s ease;
+}
+
+.log-container.hidden {
+    height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-width: 0;
+    margin-top: 0;
+    overflow: hidden;
+}
+
+.log-entry {
+    margin: 2px 0;
+    font-size: 14px;
+}
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin: 10px auto;
+    max-width: 100%;
+    padding: 0 10px;
+}
+
+button {
+    background-color: #222;
+    color: #c0c0c0;
+    border: 1px solid #444;
+    padding: 5px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    transition: all 0.3s ease;
+}
+
+button:hover {
+    background-color: #333;
+    color: #fff;
+    box-shadow: 0 0 5px rgba(100, 100, 100, 0.5);
+}
+
+.controls-info {
+    margin-top: 15px;
+    margin-bottom: 15px;
+    border: 1px solid #444;
+    padding: 10px;
+    border-radius: 4px;
+    text-align: left;
+    background-color: #0a0a0a;
+}
+
+.controls-info h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #d0d0d0;
+    text-align: center;
+    font-family: 'Courier New', monospace;
+}
+
+.controls-info ul {
+    margin: 0;
+    padding-left: 20px;
+    color: #a0a0a0;
+}
+
+.controls-info li {
+    margin: 5px 0;
+}
+
+.log-toggle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 15px;
+    padding: 5px 10px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    background-color: #0a0a0a;
+}
+
+.log-toggle:hover {
+    background-color: #222;
+}
+
+.log-toggle-icon {
+    transition: transform 0.3s ease;
+}
+
+.log-toggle.collapsed .log-toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.primary-action-button {
+    width: 100%;
+    max-width: 300px;
+    margin: 10px auto;
+    padding: 15px 30px;
+    font-size: clamp(16px, 4vw, 18px);
+}
+
+.primary-action-button:hover {
+    background-color: #444;
+    color: #fff;
+    box-shadow: 0 0 10px rgba(100, 100, 100, 0.5);
+}
+
+.primary-action-button:active {
+    transform: scale(0.95);
+}
+
+.game-state-message {
+    color: #d07070;
+    font-size: 24px;
+    margin: 10px 0;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 1px;
+    display: none;
+}
+
+.game-state-message.visible {
+    display: block;
+}
+
+/* Volume control styling */
+.volume-control {
+    flex: 1 1 auto;
+    min-width: 200px;
+    max-width: 300px;
+    margin: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: #222;
+    padding: 5px 10px;
+    border-radius: 4px;
+    border: 1px solid #444;
+    box-sizing: border-box;
+}
+
+.volume-control label {
+    margin-right: 8px;
+    color: #c0c0c0;
+    font-family: 'Courier New', monospace;
+}
+
+.volume-control input[type="range"] {
+    -webkit-appearance: none;
+    width: 100px;
+    height: 6px;
+    background: #333;
+    border-radius: 3px;
+    outline: none;
+}
+
+.volume-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #c0c0c0;
+    cursor: pointer;
+}
+
+.volume-control input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #c0c0c0;
+    cursor: pointer;
+    border: none;
+}
+
+.volume-control span {
+    margin-left: 8px;
+    color: #c0c0c0;
+    font-family: 'Courier New', monospace;
+    width: 40px;
+    text-align: right;
+}
+
+.fps-counter {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    z-index: 100;
+}
+
+.game-title {
+    font-size: 32px; 
+    margin: 10px 0;
+    color: #d0d0d0;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 2px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+        width: 98%;
+    }
+    .controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .volume-control {
+        width: 100%;
+        max-width: none;
+        margin: 5px 0;
+    }
+    .controls-info {
+        font-size: 14px;
+    }
+    .log-container {
+        height: 100px;
+    }
+    .score-display {
+        font-size: 20px;
+    }
+    .high-score {
+        font-size: 16px;
+    }
+}
