@@ -201,6 +201,10 @@ pub const Game = struct {
             // Accelerate forward
             const forward_dir = [_]f32{ 1.0, 0.0, 0.0 };
             self.truck.accelerate(forward_dir, models.truck_ACCELERATION, capped_delta);
+
+            // Make sure camera follows immediately when accelerating
+            const camera_offset = [_]f32{ -8.0, 10.0, 15.0 };
+            self.camera.followTarget(self.truck.model.position, camera_offset);
         } else if (self.left_key_pressed) {
             // Apply brakes
             self.truck.velocity[0] *= 0.95;
@@ -223,6 +227,11 @@ pub const Game = struct {
 
         // Update truck physics
         self.truck.update(capped_delta);
+
+        // Always ensure camera follows truck after position update
+        // Use a fixed offset for isometric view
+        const camera_offset = [_]f32{ -8.0, 10.0, 15.0 };
+        self.camera.followTarget(self.truck.model.position, camera_offset);
 
         // Check for out of fuel
         if (self.truck.fuel <= 0 and self.truck.velocity[0] < 1.0) {
@@ -271,8 +280,11 @@ pub const Game = struct {
 
     fn renderGame(self: *Game) void {
         // Update camera to follow the truck
-        const camera_offset = [_]f32{ -5.0, 8.0, 12.0 }; // Offset for isometric view
+        const camera_offset = [_]f32{ -8.0, 10.0, 15.0 }; // Adjusted offset for better centering
         self.camera.followTarget(self.truck.model.position, camera_offset);
+
+        // Make sure the camera's view matrix is updated
+        self.camera.updateViewMatrix();
 
         // Clear the screen with sky blue
         self.renderer.beginFrame(.{ 135, 206, 235 });
@@ -287,7 +299,7 @@ pub const Game = struct {
     fn renderMenu(self: *Game) void {
         // Position camera for menu view
         const menu_position = [_]f32{ 0.0, 0.0, -5.0 }; // Default truck position
-        const camera_offset = [_]f32{ -5.0, 8.0, 12.0 }; // Same offset as in game
+        const camera_offset = [_]f32{ -8.0, 10.0, 15.0 }; // Same offset as in game
         self.camera.followTarget(menu_position, camera_offset);
 
         // Clear the screen with sky blue
@@ -298,47 +310,6 @@ pub const Game = struct {
 
         // End frame
         self.renderer.endFrame();
-    }
-
-    pub fn handleJump(self: *Game) void {
-        if (self.state == GameState.Menu) {
-            // Start game if in menu
-            self.state = GameState.Playing;
-            // Reset render timers
-            self.menu_render_timer = 0;
-            self.pause_render_timer = 0;
-            self.gameover_render_timer = 0;
-            self.victory_render_timer = 0;
-            return;
-        }
-
-        if (self.state == GameState.Paused) {
-            // Resume game if paused
-            self.state = GameState.Playing;
-            // Reset render timers
-            self.pause_render_timer = 0;
-            return;
-        }
-
-        if (self.state == GameState.GameOver or self.state == GameState.Victory) {
-            // Reset game if game over or victory
-            // Reset render timers
-            self.gameover_render_timer = 0;
-            self.victory_render_timer = 0;
-            _ = self.reset(self.alloc) catch {
-                // Handle error
-                return;
-            };
-            return;
-        }
-
-        // Jump when playing
-        if (self.state == GameState.Playing and self.truck.is_on_ground) {
-            self.truck.velocity[1] = 10.0; // Jump velocity
-            if (!self.is_muted) {
-                self.audio_system.playSound(.Jump);
-            }
-        }
     }
 
     // Input handlers for directional controls

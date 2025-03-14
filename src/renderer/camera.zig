@@ -31,7 +31,7 @@ pub const Camera = struct {
 
         // Set up initial matrices
         camera.updateViewMatrix();
-        camera.setOrthographicProjection(-15, 15, -15, 15, 0.1, 100.0); // Wider view frustum
+        camera.setOrthographicProjection(-20, 20, -15, 15, 0.1, 100.0); // Wider view frustum with more horizontal space
         camera.updateViewProjectionMatrix();
 
         return camera;
@@ -94,6 +94,9 @@ pub const Camera = struct {
 
         // Update view matrix with new position
         self.updateViewMatrix();
+
+        // Ensure view-projection matrix is updated
+        self.updateViewProjectionMatrix();
     }
 };
 

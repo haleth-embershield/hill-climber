@@ -46,11 +46,6 @@ export fn update(delta_time: f32) void {
     game.update(delta_time);
 }
 
-// Handle jump (spacebar or click) - now used to start/restart game
-export fn handleJump() void {
-    game.handleJump();
-}
-
 // Handle right key down (d key or right arrow)
 export fn handleRightKeyDown() void {
     game.handleRightKeyDown();
@@ -116,8 +111,6 @@ export fn toggleMute() void {
 export fn handleClick(x_pos: f32, y_pos: f32) void {
     _ = x_pos;
     _ = y_pos;
-    // Just call handleJump for any click
-    handleJump();
 }
 
 // Clean up resources when the module is unloaded
