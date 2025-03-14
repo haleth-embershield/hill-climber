@@ -39,19 +39,20 @@ zig build deploy
 
 ```
 src/
-  ├── main.zig       (WASM exports and initialization)
-  ├── game.zig       (Game state and logic)
-  ├── entities.zig   (Game objects like vehicles and terrain)
-  ├── renderer.zig   (WebGL rendering system)
-  ├── physics.zig    (Vehicle and terrain physics)
-  ├── procedural.zig (Procedural generation systems)
-  ├── sprites.zig    (Pixel array sprite definitions)
-  ├── audio.zig      (Audio system)
-  └── assets/        (Game assets to be bundled into WASM)
-web/
-  ├── index.html     (Main game page)
-  ├── webgl.js       (WebGL initialization)
-  └── assets/        (General assets to be served)
+  ├── main.zig         (WASM exports and initialization)
+  ├── game.zig         (Game state and logic)
+  ├── models.zig       (Game objects like vehicles and terrain)
+  ├── renderer/        (WebGL rendering system)
+  │   ├── core.zig     (Main rendering functionality)
+  │   ├── camera.zig   (Camera positioning and projection)
+  │   ├── shaders.zig  (Shader programs and uniforms)
+  │   └── mesh.zig     (Mesh creation and management)
+  ├── physics.zig      (Vehicle and terrain physics)
+  ├── procedural.zig   (Procedural generation systems)
+  ├── audio.zig        (Audio system)
+  └── assets/          (Game assets to be bundled into WASM)
+      ├── audio/       (Audio files)
+      └── shaders/     (GLSL shader code)
 ```
 
 ## Implementation Highlights

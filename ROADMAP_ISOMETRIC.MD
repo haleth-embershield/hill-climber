@@ -38,7 +38,7 @@
      - Initialize WebGL context via JavaScript/WASM glue.
      - Upload truck vertices to a vertex buffer.
      - Use an orthographic projection matrix with a 45° tilt for isometric view.
-     - Example matrix setup (JS side):
+     - Example matrix setup (JS side): *NOTE: see amended below, MINIMIZE JS USAGE!*
        ```javascript
        const m = mat4.create();
        mat4.ortho(m, -5, 5, -5, 5, 0, 10); // Adjust bounds
