@@ -189,6 +189,15 @@ const CommandBuffer = struct {
         self.commands[0] = @intCast(self.count);
         return self.commands.ptr;
     }
+
+    // New function to get the buffer ID from the last command
+    fn getLastBufferId(self: *CommandBuffer) u32 {
+        if (self.count == 0) return 0;
+
+        const index = (self.count - 1) * 4 + 1;
+        // The buffer ID is stored in the first parameter by WebGL.js
+        return self.commands[index + 1];
+    }
 };
 
 /// Internal image buffer representation
@@ -378,7 +387,18 @@ pub const Renderer = struct {
     fn uploadMesh(self: *Renderer, mesh: mesh_mod.Mesh) !u32 {
         // Create vertex buffer
         self.command_buffer.addCreateBufferCommand();
-        const vertex_buffer_id: u32 = 1; // In a real implementation, we'd get this from WebGL
+
+        // Execute the command to create the buffer and get its ID
+        executeBatchedCommands(self.command_buffer.getBufferPtr(), @intCast(self.frame_buffer.width), @intCast(self.frame_buffer.height));
+
+        // Get the buffer ID from the command buffer
+        const vertex_buffer_id = self.command_buffer.getLastBufferId();
+        if (vertex_buffer_id == 0) {
+            return error.BufferCreationFailed;
+        }
+
+        // Reset the command buffer for the next commands
+        self.command_buffer.reset();
 
         // Store buffer ID in mesh
         var mesh_copy = mesh;
@@ -390,9 +410,24 @@ pub const Renderer = struct {
         // Upload vertex data
         self.command_buffer.addBufferDataCommand(GL.ARRAY_BUFFER, @ptrCast(mesh.getVertexDataPtr()), mesh.getVertexDataSize(), GL.STATIC_DRAW);
 
+        // Execute the commands to bind and upload data
+        executeBatchedCommands(self.command_buffer.getBufferPtr(), @intCast(self.frame_buffer.width), @intCast(self.frame_buffer.height));
+        self.command_buffer.reset();
+
         // Create index buffer
         self.command_buffer.addCreateBufferCommand();
-        const index_buffer_id = vertex_buffer_id + 1; // Use vertex_buffer_id + 1 for index buffer
+
+        // Execute the command to create the index buffer
+        executeBatchedCommands(self.command_buffer.getBufferPtr(), @intCast(self.frame_buffer.width), @intCast(self.frame_buffer.height));
+
+        // Get the index buffer ID
+        const index_buffer_id = self.command_buffer.getLastBufferId();
+        if (index_buffer_id == 0) {
+            return error.BufferCreationFailed;
+        }
+
+        // Reset the command buffer for the next commands
+        self.command_buffer.reset();
 
         // Store index buffer ID in mesh
         mesh_copy.index_buffer_id = index_buffer_id;
@@ -403,7 +438,7 @@ pub const Renderer = struct {
         // Upload index data
         self.command_buffer.addBufferDataCommand(GL.ELEMENT_ARRAY_BUFFER, @ptrCast(mesh.getIndexDataPtr()), mesh.getIndexDataSize(), GL.STATIC_DRAW);
 
-        // Execute the commands to create the buffers
+        // Execute the commands to bind and upload index data
         executeBatchedCommands(self.command_buffer.getBufferPtr(), @intCast(self.frame_buffer.width), @intCast(self.frame_buffer.height));
         self.command_buffer.reset();
 
@@ -439,8 +474,15 @@ pub const Renderer = struct {
 
     /// Render a mesh with the given model matrix
     fn renderMesh(self: *Renderer, mesh_id: u32, model_matrix: *const [16]f32) void {
+        // Find the mesh in our list to get its buffer IDs
+        const vertex_buffer_id: u32 = mesh_id;
+        const index_buffer_id: u32 = mesh_id + 1;
+
+        // In a real implementation, we'd store the mesh object and get its buffer IDs
+        // For now, we'll use the mesh_id as the vertex buffer ID and mesh_id + 1 as the index buffer ID
+
         // Use the shader program first
-        self.command_buffer.addBindBufferCommand(GL.ARRAY_BUFFER, mesh_id);
+        self.command_buffer.addBindBufferCommand(GL.ARRAY_BUFFER, vertex_buffer_id);
 
         // Verify buffer is bound before setting attributes
         // Position attribute
@@ -474,7 +516,7 @@ pub const Renderer = struct {
         self.command_buffer.addEnableVertexAttribArrayCommand(2);
 
         // Bind index buffer before computing matrices
-        self.command_buffer.addBindBufferCommand(GL.ELEMENT_ARRAY_BUFFER, mesh_id + 1);
+        self.command_buffer.addBindBufferCommand(GL.ELEMENT_ARRAY_BUFFER, index_buffer_id);
 
         // Compute model-view-projection matrix
         var mvp: [16]f32 = undefined;

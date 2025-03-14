@@ -204,6 +204,11 @@ function executeBatchedCommands(commandBuffer, width, height, zigMemory) {
                 const bufferId = Object.keys(glResources.buffers).length + 1;
                 glResources.buffers[bufferId] = newBuffer;
                 
+                // Store the buffer ID in the command data so Zig can read it
+                // This is a hack to return the buffer ID to Zig
+                // In a real implementation, we'd use a proper return value mechanism
+                commandData[cmdIndex + 1] = bufferId;
+                
                 console.log('Created buffer with ID:', bufferId);
                 break;
                 
