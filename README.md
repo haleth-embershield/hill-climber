@@ -1,13 +1,11 @@
-# Hill Climber
+# Isometric Hill Climber
 
-A retro-style hill climbing game built with Zig, WebAssembly, and WebGL. Race your vehicle up procedurally generated terrain, navigate challenging obstacles, and reach the highest peaks!
+A hill climbing game built with Zig, WebAssembly, and WebGL. Race your vehicle up procedurally generated terrain, navigate challenging obstacles, and reach the highest peaks!
 
 ## Game Features
 
-- **Pixel Art Sprites**: Retro-style vehicles and environment elements rendered using pixel array art
 - **Procedural Generation**: Dynamically generated terrain, obstacles, and environments for endless gameplay
 - **Physics-Based Gameplay**: Realistic vehicle physics with suspension, gravity, and terrain interaction
-- **Multiple Vehicles**: Choose from different vehicles (bikes, trucks, etc.) with unique handling characteristics
 - **Progressive Difficulty**: Increasingly challenging terrain as you advance
 
 ## Getting Started
@@ -57,42 +55,52 @@ src/
 
 ## Implementation Highlights
 
-### Pixel Array Sprites
 
-The game uses pixel arrays for rendering sprites, allowing for efficient memory usage and retro aesthetics:
-
-```zig
-// Example pixel array for a motorcycle sprite
-const MOTORCYCLE_SPRITE = [_][_]u8{
-    .{0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0},
-    .{0,0,0,0,0,1,2,2,2,1,0,0,0,0,0,0},
-    // ... more rows ...
-    .{0,3,3,3,3,0,0,0,0,0,3,3,3,3,0,0},
-};
-```
 
 ### Procedural Terrain
 
 The game generates terrain procedurally, creating unique landscapes each time you play:
 
-```zig
-// Generate terrain with varying difficulty
-terrain = generateTerrainSegment(allocator, seed, length, difficulty);
-```
 
 ## Development Roadmap
 
-- [ ] Basic vehicle physics and controls
-- [ ] Simple procedural terrain generation
-- [ ] Pixel array sprite rendering system
-- [ ] Generate bike/truck with pixel art array (Sprites as Pixel Array)
-- [ ] Generate trees and rocks procedurally (Pixel Array function based on params + seed)
-- [ ] Procedurally generate terrain (include multiple types with different frictions/attributes)
-- [ ] Add multiple vehicle types with different characteristics
-- [ ] Implement game progression and difficulty scaling
-- [ ] Add sound effects and background music
-- [ ] Implement a scoring and achievement system
-- [ ] Add mobile touch controls
+### Phase 1: Setup and Basic Rendering
+- [ ] Set up WebGL context and Zig WASM bridge (see @core.zig)
+- [ ] Implement basic matrix math in Zig (projection, rotation)
+- [ ] Create simple truck mesh with vertex buffer
+- [ ] Add isometric projection (45° tilt)
+- [ ] Generate and render basic hill mesh
+- [ ] Set up depth testing and basic shaders
+
+### Phase 2: Movement and Physics
+- [ ] Add truck position and rotation handling
+- [ ] Implement basic physics (gravity, friction)
+- [ ] Add keyboard controls for truck movement
+- [ ] Generate procedural hill terrain (sine waves/slopes)
+- [ ] Add hill collision detection and response
+- [ ] Make truck tilt based on hill slope
+
+### Phase 3: Visual Enhancement
+- [ ] Add procedurally generated trees
+- [ ] Implement tree shadows and transparency
+- [ ] Improve truck and terrain shaders
+- [ ] Add basic particle effects (dust, exhaust)
+- [ ] Implement smooth camera follow
+
+### Phase 4: Polish and Features
+- [ ] Optimize rendering with batching
+- [ ] Add multiple vehicle types
+- [ ] Implement scoring system
+- [ ] Add sound effects and music
+- [ ] Add touch controls for mobile
+- [ ] Polish visuals and gameplay feel
+
+### Phase 5: Future Enhancements
+- [ ] Port to WebGPU
+- [ ] Add compute shader terrain generation
+- [ ] Expand to full 3D with free camera
+- [ ] Add multiplayer support
+- [ ] Implement advanced visual effects
 
 ## License
 
