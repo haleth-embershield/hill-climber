@@ -2,6 +2,7 @@ const std = @import("std");
 const models = @import("models.zig");
 const renderer = @import("renderer/core.zig");
 const audio = @import("audio.zig");
+const camera = @import("renderer/camera.zig");
 
 // Game state enum
 pub const GameState = enum {
@@ -15,7 +16,7 @@ pub const GameState = enum {
 // Game data structure
 pub const Game = struct {
     state: GameState,
-    truck: models.Truck,
+    truck: models.truck,
     terrain: models.Terrain,
     camera_x: f32,
     score: u32,
@@ -37,27 +38,48 @@ pub const Game = struct {
     down_key_pressed: bool,
     // Audio state
     is_muted: bool,
+    alloc: std.mem.Allocator,
+    width: u32,
+    height: u32,
+    game_over: bool,
+    show_menu: bool,
+    menu_selection: u32,
+    camera: *camera.Camera,
 
-    pub fn init(alloc: std.mem.Allocator, width: usize, height: usize) !Game {
-        // Initialize renderer
-        const game_renderer = try renderer.Renderer.init(alloc, width, height);
-
+    pub fn init(alloc: std.mem.Allocator, width: u32, height: u32) !Game {
         // Initialize audio system
-        const audio_system = audio.AudioSystem.init();
+        var audio_system = audio.AudioSystem.init();
+
+        // Initialize truck with starting position and audio system
+        const truck_instance = models.truck.init(50.0, 50.0, &audio_system);
+
+        // Initialize renderer
+        var game_renderer = try renderer.Renderer.init(alloc, width, height);
+        try game_renderer.setupScene();
+
+        // Initialize camera - allocate memory for it
+        const camera_ptr = try alloc.create(camera.Camera);
+        camera_ptr.* = camera.Camera.init();
 
         // Initialize terrain
-        const terrain = try models.Terrain.init(alloc, models.TERRAIN_LENGTH, 12345);
+        const terrain_instance = try models.Terrain.init(alloc, models.TERRAIN_LENGTH, 12345);
 
-        // Create a properly initialized game data structure
-        var game = Game{
-            .state = GameState.Menu,
-            .bike = undefined, // Will be initialized below
-            .terrain = terrain,
-            .camera_x = 0,
+        return Game{
+            .alloc = alloc,
+            .width = width,
+            .height = height,
+            .truck = truck_instance,
+            .renderer = game_renderer,
+            .camera = camera_ptr,
             .score = 0,
+            .game_over = false,
+            .show_menu = true,
+            .menu_selection = 0,
+            .state = GameState.Menu,
+            .terrain = terrain_instance,
+            .camera_x = 0,
             .high_score = 0,
             .random_seed = 12345,
-            .renderer = game_renderer,
             .audio_system = audio_system,
             .menu_render_timer = 0,
             .pause_render_timer = 0,
@@ -69,11 +91,6 @@ pub const Game = struct {
             .down_key_pressed = false,
             .is_muted = false,
         };
-
-        // Initialize bike at a safe starting position
-        game.truck = models.Truck.init(models.TRUCK_SIZE * 2, models.GAME_HEIGHT / 2, &game.audio_system);
-
-        return game;
     }
 
     // Simple random number generator
@@ -100,8 +117,8 @@ pub const Game = struct {
         self.random_seed += 1;
         self.terrain = try models.Terrain.init(alloc, models.TERRAIN_LENGTH, self.random_seed);
 
-        // Reset bike to starting position
-        self.truck = models.Truck.init(models.TRUCK_SIZE * 2, models.GAME_HEIGHT / 2, &self.audio_system);
+        // Reset Truck to starting position
+        self.truck = models.truck.init(models.truck_SIZE * 2, models.GAME_HEIGHT / 2, &self.audio_system);
 
         // Reset camera and score
         self.camera_x = 0;
@@ -160,33 +177,33 @@ pub const Game = struct {
             return;
         }
 
-        // Handle input for bike movement
+        // Handle input for truck movement
         if (self.right_key_pressed) {
-            self.bike.accelerate(capped_delta);
+            self.truck.accelerate(capped_delta);
         } else if (self.left_key_pressed) {
             // Apply brakes
-            self.bike.velocity_x *= 0.95;
+            self.truck.velocity_x *= 0.95;
         } else {
             // Apply normal friction when not accelerating
-            self.bike.velocity_x *= 0.98;
+            self.truck.velocity_x *= 0.98;
         }
 
         // Handle tilt controls
         if (self.up_key_pressed) {
-            // Tilt bike backward (wheelie)
-            self.bike.setTilt(-30.0);
+            // Tilt truck backward (wheelie)
+            self.truck.setTilt(-30.0);
         } else if (self.down_key_pressed) {
-            // Tilt bike forward
-            self.bike.setTilt(30.0);
+            // Tilt truck forward
+            self.truck.setTilt(30.0);
         } else if (!self.up_key_pressed and !self.down_key_pressed) {
             // Return to neutral tilt gradually
-            self.bike.setTilt(self.bike.tilt_factor * 0.8);
+            self.truck.setTilt(self.truck.tilt_factor * 0.8);
         }
 
-        // Update bike
-        self.bike.update(capped_delta, &self.terrain);
+        // Update truck
+        self.truck.update(capped_delta, &self.terrain);
 
-        // Update camera to follow bike
+        // Update camera to follow truck
         if (self.truck.x > self.camera_x + models.GAME_WIDTH / 3) {
             self.camera_x = self.truck.x - models.GAME_WIDTH / 3;
         }
@@ -206,8 +223,14 @@ pub const Game = struct {
         // Update score based on distance traveled
         self.score = @intFromFloat(self.truck.x / 100.0);
 
-        // Render the current frame
-        self.renderGame();
+        // Begin frame with a sky blue background
+        self.renderer.beginFrame([_]u8{ 135, 206, 235 });
+
+        // Render the 3D scene
+        self.renderer.renderScene();
+
+        // Finish frame
+        self.renderer.endFrame();
     }
 
     fn gameOver(self: *Game) void {
@@ -245,8 +268,8 @@ pub const Game = struct {
         // Draw terrain
         self.terrain.render(&self.renderer, self.camera_x);
 
-        // Draw bike
-        self.bike.render(&self.renderer, self.camera_x);
+        // Draw truck
+        self.truck.render(&self.renderer, self.camera_x);
 
         // Draw HUD
         self.renderHUD();
@@ -266,7 +289,7 @@ pub const Game = struct {
 
     fn renderHUD(self: *Game) void {
         // Draw fuel gauge
-        const fuel_width = @as(usize, @intFromFloat(self.bike.fuel * 2.0));
+        const fuel_width = @as(usize, @intFromFloat(self.truck.fuel * 2.0));
         self.renderer.drawRect(10, 10, fuel_width, 20, .{ 255, 215, 0 });
         self.renderer.drawRect(10, 10, 200, 1, .{ 0, 0, 0 }); // Top border
         self.renderer.drawRect(10, 30, 200, 1, .{ 0, 0, 0 }); // Bottom border
@@ -294,8 +317,8 @@ pub const Game = struct {
         // Draw a sample terrain
         self.terrain.render(&self.renderer, 0);
 
-        // Draw a sample bike in the center
-        const truck = models.Truck.init(models.GAME_WIDTH / 2, models.GAME_HEIGHT / 2, &self.audio_system);
+        // Draw a sample truck in the center
+        const truck = models.truck.init(models.GAME_WIDTH / 2, models.GAME_HEIGHT / 2, &self.audio_system);
         truck.render(&self.renderer, 0);
 
         // End frame

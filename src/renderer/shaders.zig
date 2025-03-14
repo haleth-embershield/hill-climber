@@ -122,6 +122,11 @@ extern fn setUniformMatrix4fv(location: i32, value_ptr: [*]const f32) void;
 extern fn setUniform3f(location: i32, x: f32, y: f32, z: f32) void;
 extern fn setUniform4f(location: i32, x: f32, y: f32, z: f32, w: f32) void;
 
+/// Get the location of a uniform variable in a shader program
+pub fn getShaderUniformLocation(program_id: u32, name: []const u8) i32 {
+    return getUniformLocation(program_id, name.ptr, name.len);
+}
+
 /// Create and compile a shader
 pub fn compileShader(shader_type: ShaderType, source: []const u8) u32 {
     return createShader(@intFromEnum(shader_type), source.ptr, source.len);
@@ -158,7 +163,7 @@ pub fn deleteShaderProgram(program: *ShaderProgram) void {
 
 /// Set a 4x4 matrix uniform in a shader
 pub fn setMatrix4Uniform(program_id: u32, name: []const u8, matrix: *const [16]f32) void {
-    const location = getUniformLocation(program_id, name.ptr, name.len);
+    const location = getShaderUniformLocation(program_id, name);
     if (location >= 0) {
         setUniformMatrix4fv(location, matrix.ptr);
     }
@@ -166,7 +171,7 @@ pub fn setMatrix4Uniform(program_id: u32, name: []const u8, matrix: *const [16]f
 
 /// Set a vec3 uniform in a shader
 pub fn setVec3Uniform(program_id: u32, name: []const u8, x: f32, y: f32, z: f32) void {
-    const location = getUniformLocation(program_id, name.ptr, name.len);
+    const location = getShaderUniformLocation(program_id, name);
     if (location >= 0) {
         setUniform3f(location, x, y, z);
     }
@@ -174,7 +179,7 @@ pub fn setVec3Uniform(program_id: u32, name: []const u8, x: f32, y: f32, z: f32)
 
 /// Set a vec4 uniform in a shader
 pub fn setVec4Uniform(program_id: u32, name: []const u8, x: f32, y: f32, z: f32, w: f32) void {
-    const location = getUniformLocation(program_id, name.ptr, name.len);
+    const location = getShaderUniformLocation(program_id, name);
     if (location >= 0) {
         setUniform4f(location, x, y, z, w);
     }

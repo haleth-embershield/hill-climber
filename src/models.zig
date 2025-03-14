@@ -4,9 +4,9 @@ const audio = @import("audio.zig");
 
 // Game constants
 pub const GRAVITY: f32 = 1000.0;
-pub const BIKE_ACCELERATION: f32 = 300.0;
-pub const BIKE_MAX_SPEED: f32 = 300.0;
-pub const BIKE_SIZE: f32 = 30.0;
+pub const truck_ACCELERATION: f32 = 300.0;
+pub const truck_MAX_SPEED: f32 = 300.0;
+pub const truck_SIZE: f32 = 30.0;
 pub const WHEEL_SIZE: f32 = 15.0;
 pub const TERRAIN_SEGMENT_WIDTH: f32 = 50.0;
 pub const FUEL_CONSUMPTION_RATE: f32 = 10.0; // Fuel units per second
@@ -17,8 +17,8 @@ pub const GAME_WIDTH: usize = 800;
 pub const GAME_HEIGHT: usize = 600;
 pub const TERRAIN_LENGTH: usize = 50; // Number of terrain segments to generate
 
-// Bike entity
-pub const Bike = struct {
+// truck entity
+pub const truck = struct {
     x: f32,
     y: f32,
     velocity_x: f32,
@@ -29,8 +29,8 @@ pub const Bike = struct {
     audio_system: *audio.AudioSystem,
     tilt_factor: f32, // Added to track manual tilt
 
-    pub fn init(x: f32, y: f32, audio_system: *audio.AudioSystem) Bike {
-        return Bike{
+    pub fn init(x: f32, y: f32, audio_system: *audio.AudioSystem) truck {
+        return truck{
             .x = x,
             .y = y,
             .velocity_x = 0,
@@ -43,7 +43,7 @@ pub const Bike = struct {
         };
     }
 
-    pub fn update(self: *Bike, delta_time: f32, terrain: *Terrain) void {
+    pub fn update(self: *truck, delta_time: f32, terrain: *Terrain) void {
         // Apply gravity if not on ground
         if (!self.is_on_ground) {
             self.velocity_y += GRAVITY * delta_time;
@@ -92,20 +92,20 @@ pub const Bike = struct {
 
         // Consume fuel when moving
         if (self.velocity_x > 0) {
-            self.fuel -= FUEL_CONSUMPTION_RATE * delta_time * (self.velocity_x / BIKE_MAX_SPEED);
+            self.fuel -= FUEL_CONSUMPTION_RATE * delta_time * (self.velocity_x / truck_MAX_SPEED);
             if (self.fuel < 0) self.fuel = 0;
         }
 
         // Clamp position to prevent going out of bounds
-        self.x = std.math.clamp(self.x, BIKE_SIZE / 2, @as(f32, @floatFromInt(GAME_WIDTH * 5)) - BIKE_SIZE / 2);
-        self.y = std.math.clamp(self.y, BIKE_SIZE / 2, @as(f32, @floatFromInt(GAME_HEIGHT)) - BIKE_SIZE / 2);
+        self.x = std.math.clamp(self.x, truck_SIZE / 2, @as(f32, @floatFromInt(GAME_WIDTH * 5)) - truck_SIZE / 2);
+        self.y = std.math.clamp(self.y, truck_SIZE / 2, @as(f32, @floatFromInt(GAME_HEIGHT)) - truck_SIZE / 2);
     }
 
-    pub fn accelerate(self: *Bike, delta_time: f32) void {
+    pub fn accelerate(self: *truck, delta_time: f32) void {
         if (self.fuel <= 0) return; // Can't accelerate without fuel
 
-        self.velocity_x += BIKE_ACCELERATION * delta_time;
-        if (self.velocity_x > BIKE_MAX_SPEED) self.velocity_x = BIKE_MAX_SPEED;
+        self.velocity_x += truck_ACCELERATION * delta_time;
+        if (self.velocity_x > truck_MAX_SPEED) self.velocity_x = truck_MAX_SPEED;
 
         // Play engine sound
         if (self.is_on_ground) {
@@ -113,19 +113,19 @@ pub const Bike = struct {
         }
     }
 
-    pub fn setTilt(self: *Bike, tilt_amount: f32) void {
+    pub fn setTilt(self: *truck, tilt_amount: f32) void {
         self.tilt_factor = tilt_amount;
     }
 
-    pub fn render(self: Bike, renderer_obj: *renderer.Renderer, camera_x: f32) void {
+    pub fn render(self: truck, renderer_obj: *renderer.Renderer, camera_x: f32) void {
         const screen_x: usize = @intFromFloat(@max(0, @min(self.x - camera_x, @as(f32, @floatFromInt(GAME_WIDTH - 1)))));
         const screen_y: usize = @intFromFloat(@max(0, @min(self.y, @as(f32, @floatFromInt(GAME_HEIGHT - 1)))));
 
-        // Draw bike body (rectangle)
-        const body_width: usize = @intFromFloat(BIKE_SIZE);
-        const body_height: usize = @intFromFloat(BIKE_SIZE / 2);
+        // Draw truck body (rectangle)
+        const body_width: usize = @intFromFloat(truck_SIZE);
+        const body_height: usize = @intFromFloat(truck_SIZE / 2);
 
-        // Draw bike as a simple shape for now
+        // Draw truck as a simple shape for now
         renderer_obj.drawRect(screen_x - body_width / 2, screen_y - body_height / 2, body_width, body_height, .{ 255, 0, 0 });
 
         // Draw wheels

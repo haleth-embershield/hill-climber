@@ -176,26 +176,26 @@ pub fn createCylinder(allocator: std.mem.Allocator, radius: f32, height: f32, se
         // Indices for top cap
         const top_cap_idx = i * 3;
         indices[top_cap_idx] = 0; // Top center
-        indices[top_cap_idx + 1] = top_idx;
-        indices[top_cap_idx + 2] = if (i == segment_count - 1) 2 else top_idx + 2;
+        indices[top_cap_idx + 1] = @intCast(top_idx);
+        indices[top_cap_idx + 2] = if (i == segment_count - 1) 2 else @intCast(top_idx + 2);
 
         // Indices for bottom cap
         const bottom_cap_idx = (segment_count + i) * 3;
         indices[bottom_cap_idx] = 1; // Bottom center
-        indices[bottom_cap_idx + 1] = if (i == segment_count - 1) 3 else bottom_idx + 2;
-        indices[bottom_cap_idx + 2] = bottom_idx;
+        indices[bottom_cap_idx + 1] = if (i == segment_count - 1) 3 else @intCast(bottom_idx + 2);
+        indices[bottom_cap_idx + 2] = @intCast(bottom_idx);
 
         // Indices for side - first triangle
         const side_idx = (2 * segment_count + i * 2) * 3;
-        indices[side_idx] = top_idx;
-        indices[side_idx + 1] = bottom_idx;
-        indices[side_idx + 2] = if (i == segment_count - 1) 3 else bottom_idx + 2;
+        indices[side_idx] = @intCast(top_idx);
+        indices[side_idx + 1] = @intCast(bottom_idx);
+        indices[side_idx + 2] = if (i == segment_count - 1) 3 else @intCast(bottom_idx + 2);
 
         // Indices for side - second triangle
         const side2_idx = (2 * segment_count + i * 2 + 1) * 3;
-        indices[side2_idx] = top_idx;
-        indices[side2_idx + 1] = if (i == segment_count - 1) 3 else bottom_idx + 2;
-        indices[side2_idx + 2] = if (i == segment_count - 1) 2 else top_idx + 2;
+        indices[side2_idx] = @intCast(top_idx);
+        indices[side2_idx + 1] = if (i == segment_count - 1) 3 else @intCast(bottom_idx + 2);
+        indices[side2_idx + 2] = if (i == segment_count - 1) 2 else @intCast(top_idx + 2);
     }
 
     return Mesh{
