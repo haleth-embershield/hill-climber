@@ -239,6 +239,42 @@ const Image = struct {
 
 /// WebGL function bindings
 extern fn executeBatchedCommands(cmd_ptr: [*]u32, width: u32, height: u32) void;
+extern "env" fn registerCallback(callbackType: [*:0]const u8, callbackFn: ?*const anyopaque) bool;
+
+/// Callback types
+pub const BufferCreatedCallback = fn (bufferId: u32) callconv(.C) void;
+pub const ShaderCreatedCallback = fn (shaderId: u32) callconv(.C) void;
+pub const ProgramCreatedCallback = fn (programId: u32) callconv(.C) void;
+pub const ErrorCallback = fn (errorPtr: [*]const u8, errorLen: usize) callconv(.C) void;
+
+/// Callback string constants
+const BUFFER_CREATED_CALLBACK = "buffer_created\x00";
+const SHADER_CREATED_CALLBACK = "shader_created\x00";
+const PROGRAM_CREATED_CALLBACK = "program_created\x00";
+const ERROR_CALLBACK = "error\x00";
+
+/// Global state for callbacks
+var lastBufferId: u32 = 0;
+var lastError: []const u8 = "";
+
+/// Callback implementations
+export fn handleBufferCreated(bufferId: u32) void {
+    lastBufferId = bufferId;
+}
+
+export fn handleError(errorPtr: [*]const u8, errorLen: usize) void {
+    lastError = errorPtr[0..errorLen];
+}
+
+/// Initialize callbacks
+fn initCallbacks() bool {
+    const buffer_cb: ?*const anyopaque = @ptrCast(&handleBufferCreated);
+    const error_cb: ?*const anyopaque = @ptrCast(&handleError);
+
+    _ = registerCallback(BUFFER_CREATED_CALLBACK, buffer_cb);
+    _ = registerCallback(ERROR_CALLBACK, error_cb);
+    return true;
+}
 
 /// WebGL constants
 pub const GL = struct {
@@ -281,6 +317,9 @@ pub const Renderer = struct {
 
     /// Initialize a new renderer with a given resolution
     pub fn init(allocator: std.mem.Allocator, width: usize, height: usize) !Renderer {
+        // Initialize callbacks first
+        _ = initCallbacks();
+
         const max_meshes = 32; // Support up to 32 renderable objects
 
         var model_matrices = try allocator.alloc(?[16]f32, max_meshes);
@@ -394,14 +433,23 @@ pub const Renderer = struct {
 
     /// Upload a mesh to the GPU and return its ID
     fn uploadMesh(self: *Renderer, mesh: mesh_mod.Mesh) !u32 {
+        // Reset callback state
+        lastBufferId = 0;
+        lastError = "";
+
         // Create vertex buffer
         self.command_buffer.addCreateBufferCommand();
 
-        // Execute the command to create the buffer and get its ID
+        // Execute the command to create the buffer
         executeBatchedCommands(self.command_buffer.getBufferPtr(), @intCast(self.frame_buffer.width), @intCast(self.frame_buffer.height));
 
-        // Get the buffer ID from the command buffer
-        const vertex_buffer_id = self.command_buffer.getLastBufferId();
+        // Check for errors
+        if (lastError.len > 0) {
+            return error.BufferCreationFailed;
+        }
+
+        // Get the buffer ID from the callback
+        const vertex_buffer_id = lastBufferId;
         if (vertex_buffer_id == 0) {
             return error.BufferCreationFailed;
         }
@@ -421,7 +469,17 @@ pub const Renderer = struct {
 
         // Execute the commands to bind and upload data
         executeBatchedCommands(self.command_buffer.getBufferPtr(), @intCast(self.frame_buffer.width), @intCast(self.frame_buffer.height));
+
+        // Check for errors
+        if (lastError.len > 0) {
+            return error.BufferDataUploadFailed;
+        }
+
         self.command_buffer.reset();
+
+        // Reset callback state for index buffer
+        lastBufferId = 0;
+        lastError = "";
 
         // Create index buffer
         self.command_buffer.addCreateBufferCommand();
@@ -429,8 +487,13 @@ pub const Renderer = struct {
         // Execute the command to create the index buffer
         executeBatchedCommands(self.command_buffer.getBufferPtr(), @intCast(self.frame_buffer.width), @intCast(self.frame_buffer.height));
 
-        // Get the index buffer ID
-        const index_buffer_id = self.command_buffer.getLastBufferId();
+        // Check for errors
+        if (lastError.len > 0) {
+            return error.BufferCreationFailed;
+        }
+
+        // Get the index buffer ID from the callback
+        const index_buffer_id = lastBufferId;
         if (index_buffer_id == 0) {
             return error.BufferCreationFailed;
         }
@@ -449,6 +512,12 @@ pub const Renderer = struct {
 
         // Execute the commands to bind and upload index data
         executeBatchedCommands(self.command_buffer.getBufferPtr(), @intCast(self.frame_buffer.width), @intCast(self.frame_buffer.height));
+
+        // Check for errors
+        if (lastError.len > 0) {
+            return error.BufferDataUploadFailed;
+        }
+
         self.command_buffer.reset();
 
         return vertex_buffer_id;

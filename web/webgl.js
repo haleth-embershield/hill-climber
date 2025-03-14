@@ -14,6 +14,36 @@ const glResources = {
     programs: {}
 };
 
+// Callback registry for returning values to Zig
+const callbackRegistry = {
+    // Map of callback types to Zig function references
+    callbacks: {},
+    
+    // Register a callback function from Zig
+    register: function(type, callback) {
+        this.callbacks[type] = callback;
+        console.log(`Registered callback for type: ${type}`);
+    },
+    
+    // Call a registered callback with arguments
+    invoke: function(type, ...args) {
+        const callback = this.callbacks[type];
+        if (callback) {
+            callback(...args);
+        } else {
+            console.warn(`No callback registered for type: ${type}`);
+        }
+    }
+};
+
+// Callback types
+const CallbackType = {
+    BUFFER_CREATED: 'buffer_created',
+    SHADER_CREATED: 'shader_created',
+    PROGRAM_CREATED: 'program_created',
+    ERROR: 'error'
+};
+
 // Check if WebGL is supported by the browser
 function isWebGLSupported() {
     try {
@@ -197,6 +227,8 @@ function executeBatchedCommands(commandBuffer, width, height, zigMemory) {
                 const newBuffer = gl.createBuffer();
                 if (!newBuffer) {
                     console.error('Failed to create WebGL buffer');
+                    // Invoke error callback if registered
+                    callbackRegistry.invoke(CallbackType.ERROR, 'Failed to create WebGL buffer');
                     break;
                 }
                 
@@ -204,10 +236,8 @@ function executeBatchedCommands(commandBuffer, width, height, zigMemory) {
                 const bufferId = Object.keys(glResources.buffers).length + 1;
                 glResources.buffers[bufferId] = newBuffer;
                 
-                // Store the buffer ID in the command data so Zig can read it
-                // This is a hack to return the buffer ID to Zig
-                // In a real implementation, we'd use a proper return value mechanism
-                commandData[cmdIndex + 1] = bufferId;
+                // Use the callback system to return the buffer ID to Zig
+                callbackRegistry.invoke(CallbackType.BUFFER_CREATED, bufferId);
                 
                 console.log('Created buffer with ID:', bufferId);
                 break;
@@ -222,6 +252,7 @@ function executeBatchedCommands(commandBuffer, width, height, zigMemory) {
                     console.log('Bound buffer ID:', bufferIdToBind, 'to target:', bufferType);
                 } else {
                     console.error('Invalid buffer ID:', bufferIdToBind);
+                    callbackRegistry.invoke(CallbackType.ERROR, `Invalid buffer ID: ${bufferIdToBind}`);
                 }
                 break;
                 
@@ -240,6 +271,7 @@ function executeBatchedCommands(commandBuffer, width, height, zigMemory) {
                     console.log('Uploaded', dataSize, 'bytes to buffer type:', bufferTypeForData);
                 } else {
                     console.error('No buffer bound to target:', bufferTypeForData);
+                    callbackRegistry.invoke(CallbackType.ERROR, `No buffer bound to target: ${bufferTypeForData}`);
                 }
                 break;
                 
@@ -268,6 +300,7 @@ function executeBatchedCommands(commandBuffer, width, height, zigMemory) {
                 // Make sure we have a buffer bound before setting attributes
                 if (gl.getParameter(gl.ARRAY_BUFFER_BINDING) === null) {
                     console.error('No ARRAY_BUFFER bound when calling vertexAttribPointer');
+                    callbackRegistry.invoke(CallbackType.ERROR, 'No ARRAY_BUFFER bound when calling vertexAttribPointer');
                     break;
                 }
                 
@@ -305,9 +338,11 @@ function executeBatchedCommands(commandBuffer, width, height, zigMemory) {
                         gl.uniformMatrix4fv(actualLocation, false, matrixData);
                     } else {
                         console.warn('Invalid uniform location ID:', matLocationId);
+                        callbackRegistry.invoke(CallbackType.ERROR, `Invalid uniform location ID: ${matLocationId}`);
                     }
                 } else {
                     console.warn('Invalid uniform location ID:', matLocationId);
+                    callbackRegistry.invoke(CallbackType.ERROR, `Invalid uniform location ID: ${matLocationId}`);
                 }
                 break;
                 
@@ -331,9 +366,11 @@ function executeBatchedCommands(commandBuffer, width, height, zigMemory) {
                         gl.uniform3f(actualLocation, x, y, z);
                     } else {
                         console.warn('Invalid uniform location ID:', vec3LocationId);
+                        callbackRegistry.invoke(CallbackType.ERROR, `Invalid uniform location ID: ${vec3LocationId}`);
                     }
                 } else {
                     console.warn('Invalid uniform location ID:', vec3LocationId);
+                    callbackRegistry.invoke(CallbackType.ERROR, `Invalid uniform location ID: ${vec3LocationId}`);
                 }
                 break;
                 
@@ -359,9 +396,11 @@ function executeBatchedCommands(commandBuffer, width, height, zigMemory) {
                         gl.uniform4f(actualLocation, x4, y4, z4, w4);
                     } else {
                         console.warn('Invalid uniform location ID:', vec4LocationId);
+                        callbackRegistry.invoke(CallbackType.ERROR, `Invalid uniform location ID: ${vec4LocationId}`);
                     }
                 } else {
                     console.warn('Invalid uniform location ID:', vec4LocationId);
+                    callbackRegistry.invoke(CallbackType.ERROR, `Invalid uniform location ID: ${vec4LocationId}`);
                 }
                 break;
                 
@@ -386,6 +425,7 @@ function executeBatchedCommands(commandBuffer, width, height, zigMemory) {
                 
             default:
                 console.error('Unknown WebGL command:', opcode);
+                callbackRegistry.invoke(CallbackType.ERROR, `Unknown WebGL command: ${opcode}`);
                 break;
         }
     }
@@ -451,12 +491,17 @@ function createShaderForWasm(shaderType, shaderSource) {
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
         console.error('Shader compile error:', gl.getShaderInfoLog(shader));
         gl.deleteShader(shader);
+        callbackRegistry.invoke(CallbackType.ERROR, `Shader compile error: ${gl.getShaderInfoLog(shader)}`);
         return 0;
     }
     
     // Store in resources
     const shaderId = Object.keys(glResources.shaders).length + 1;
     glResources.shaders[shaderId] = shader;
+    
+    // Use callback to return shader ID
+    callbackRegistry.invoke(CallbackType.SHADER_CREATED, shaderId);
+    
     return shaderId;
 }
 
@@ -472,6 +517,7 @@ function createProgramForWasm(vertexShaderId, fragmentShaderId) {
     
     if (!vertexShader || !fragmentShader) {
         console.error('Invalid shader IDs:', vertexShaderId, fragmentShaderId);
+        callbackRegistry.invoke(CallbackType.ERROR, `Invalid shader IDs: ${vertexShaderId}, ${fragmentShaderId}`);
         return 0;
     }
     
@@ -483,12 +529,17 @@ function createProgramForWasm(vertexShaderId, fragmentShaderId) {
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
         console.error('Program link error:', gl.getProgramInfoLog(program));
         gl.deleteProgram(program);
+        callbackRegistry.invoke(CallbackType.ERROR, `Program link error: ${gl.getProgramInfoLog(program)}`);
         return 0;
     }
     
     // Store in resources
     const programId = Object.keys(glResources.programs).length + 1;
     glResources.programs[programId] = program;
+    
+    // Use callback to return program ID
+    callbackRegistry.invoke(CallbackType.PROGRAM_CREATED, programId);
+    
     return programId;
 }
 
@@ -541,6 +592,7 @@ function getUniformLocationForWasm(programId, uniformName) {
     const program = glResources.programs[programId];
     if (!program) {
         console.error('Invalid program ID:', programId);
+        callbackRegistry.invoke(CallbackType.ERROR, `Invalid program ID: ${programId}`);
         return -1;
     }
     
@@ -572,6 +624,7 @@ function getAttribLocationForWasm(programId, attribName) {
     const program = glResources.programs[programId];
     if (!program) {
         console.error('Invalid program ID:', programId);
+        callbackRegistry.invoke(CallbackType.ERROR, `Invalid program ID: ${programId}`);
         return -1;
     }
     
@@ -593,6 +646,7 @@ function setUniformMatrix4fvForWasm(locationId, matrixData) {
         gl.uniformMatrix4fv(actualLocation, false, matrixData);
     } else {
         console.warn('Invalid uniform location ID:', locationId);
+        callbackRegistry.invoke(CallbackType.ERROR, `Invalid uniform location ID: ${locationId}`);
     }
 }
 
@@ -611,6 +665,7 @@ function setUniform3fForWasm(locationId, x, y, z) {
         gl.uniform3f(actualLocation, x, y, z);
     } else {
         console.warn('Invalid uniform location ID:', locationId);
+        callbackRegistry.invoke(CallbackType.ERROR, `Invalid uniform location ID: ${locationId}`);
     }
 }
 
@@ -629,7 +684,14 @@ function setUniform4fForWasm(locationId, x, y, z, w) {
         gl.uniform4f(actualLocation, x, y, z, w);
     } else {
         console.warn('Invalid uniform location ID:', locationId);
+        callbackRegistry.invoke(CallbackType.ERROR, `Invalid uniform location ID: ${locationId}`);
     }
+}
+
+// Register a callback function from Zig
+function registerCallbackForWasm(callbackType, callbackFn) {
+    callbackRegistry.register(callbackType, callbackFn);
+    return true;
 }
 
 // Export the WebGL interface
@@ -654,6 +716,10 @@ window.WebGLInterface = {
     setUniform3f: setUniform3fForWasm,
     setUniform4f: setUniform4fForWasm,
     
+    // Callback system
+    registerCallback: registerCallbackForWasm,
+    callbackTypes: CallbackType,
+    
     // Export WebGL constants
     GL_ARRAY_BUFFER: GL_CONSTANTS.GL_ARRAY_BUFFER,
     GL_ELEMENT_ARRAY_BUFFER: GL_CONSTANTS.GL_ELEMENT_ARRAY_BUFFER,
@@ -672,4 +738,10 @@ window.WebGLInterface = {
     // Add shader-specific constants
     GL_VERTEX_SHADER: 0x8B31,
     GL_FRAGMENT_SHADER: 0x8B30
+};
+
+// Export functions for WebAssembly environment
+window.env = {
+    executeBatchedCommands: executeBatchedCommands,
+    registerCallback: registerCallbackForWasm
 };

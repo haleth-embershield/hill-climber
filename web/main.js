@@ -200,6 +200,16 @@ const imports = {
             window.WebGLInterface.executeBatch(cmdPtr, width, height, wasmModule.memory);
         },
         
+        // Add registerCallback function for the callback system
+        registerCallback: (typePtr, callback) => {
+            const buffer = new Uint8Array(wasmModule.memory.buffer);
+            // Find the null terminator in the string
+            let len = 0;
+            while (buffer[typePtr + len] !== 0) len++;
+            const type = new TextDecoder().decode(buffer.subarray(typePtr, typePtr + len));
+            return window.WebGLInterface.registerCallback(type, callback);
+        },
+        
         // WebGL shader functions from shaders.zig
         createShader: (shader_type, source_ptr, source_len) => {
             const buffer = new Uint8Array(wasmModule.memory.buffer);
