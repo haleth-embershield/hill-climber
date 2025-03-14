@@ -204,7 +204,7 @@ pub const Game = struct {
             self.truck.accelerate(forward_dir, models.truck_ACCELERATION, capped_delta);
 
             // Make sure camera follows immediately when accelerating
-            const camera_offset = [_]f32{ 10.0, 10.0, 10.0 };
+            const camera_offset = [_]f32{ 14.43, 14.43, 14.43 };
             self.camera.followTarget(self.truck.model.position, camera_offset);
         } else if (self.left_key_pressed) {
             // Apply brakes
@@ -231,7 +231,7 @@ pub const Game = struct {
 
         // Always ensure camera follows truck after position update
         // Use a fixed offset for isometric view
-        const camera_offset = [_]f32{ 10.0, 10.0, 10.0 };
+        const camera_offset = [_]f32{ 14.43, 14.43, 14.43 };
         self.camera.followTarget(self.truck.model.position, camera_offset);
 
         // Check for out of fuel
@@ -281,7 +281,7 @@ pub const Game = struct {
 
     fn renderGame(self: *Game) void {
         // Update camera to follow the truck
-        const camera_offset = [_]f32{ 10.0, 10.0, 10.0 }; // Isometric view offset
+        const camera_offset = [_]f32{ 14.43, 14.43, 14.43 }; // Isometric view offset
         self.camera.followTarget(self.truck.model.position, camera_offset);
 
         // Make sure the camera's view matrix is updated
@@ -300,7 +300,7 @@ pub const Game = struct {
     fn renderMenu(self: *Game) void {
         // Position camera for menu view
         const menu_position = [_]f32{ 0.0, 0.0, 0.0 }; // Center position
-        const camera_offset = [_]f32{ 10.0, 10.0, 10.0 }; // Isometric view offset
+        const camera_offset = [_]f32{ 14.43, 14.43, 14.43 }; // Isometric view offset
         self.camera.followTarget(menu_position, camera_offset);
 
         // Clear the screen with sky blue

@@ -13,15 +13,23 @@ pub const Camera = struct {
     position: [3]f32,
     // Camera rotation (in radians)
     rotation: [3]f32,
+    // Camera target (look-at point)
+    target: [3]f32,
 
     /// Initialize a new isometric camera
     pub fn init() Camera {
+        // Calculate position for true isometric view (approx 25 units away)
+        // Using 1/sqrt(3) ≈ 0.577 for each axis gives a unit vector in isometric direction
+        const distance = 25.0;
+        const iso_factor = 0.577;
+
         var camera = Camera{
             .projection = [_]f32{0} ** 16,
             .view = [_]f32{0} ** 16,
             .view_projection = [_]f32{0} ** 16,
-            .position = [_]f32{ 10.0, 10.0, 10.0 }, // Position for isometric view
+            .position = [_]f32{ distance * iso_factor, distance * iso_factor, distance * iso_factor },
             .rotation = [_]f32{ -math.pi / 4.0, 0, math.pi / 4.0 }, // Classic isometric angles
+            .target = [_]f32{ 0, 0, 0 }, // Look at origin
         };
 
         // Initialize with identity matrices
@@ -31,7 +39,7 @@ pub const Camera = struct {
 
         // Set up initial matrices
         camera.updateViewMatrix();
-        camera.setOrthographicProjection(-10, 10, -10, 10, 0.1, 100.0); // Symmetric view frustum
+        camera.setOrthographicProjection(-15, 15, -15, 15, 0.1, 100.0); // Wider view frustum to see more
         camera.updateViewProjectionMatrix();
 
         return camera;
@@ -62,13 +70,15 @@ pub const Camera = struct {
         // Start with identity matrix
         identityMatrix(&self.view);
 
-        // Apply rotations (X, Y, Z order)
-        rotateMatrixX(&self.view, self.rotation[0]);
-        rotateMatrixY(&self.view, self.rotation[1]);
-        rotateMatrixZ(&self.view, self.rotation[2]);
+        // Create a look-at matrix to ensure camera points at the target (origin)
+        lookAt(self.position[0], self.position[1], self.position[2], self.target[0], self.target[1], self.target[2], 0, 1, 0, // Up vector (Y-up)
+            &self.view);
 
-        // Apply translation (inverted for camera)
-        translateMatrix(&self.view, -self.position[0], -self.position[1], -self.position[2]);
+        // Apply any additional rotations if needed
+        // Note: lookAt already handles rotation, so only use these if you need additional rotation
+        // rotateMatrixX(&self.view, self.rotation[0]);
+        // rotateMatrixY(&self.view, self.rotation[1]);
+        // rotateMatrixZ(&self.view, self.rotation[2]);
 
         // Update combined matrix
         self.updateViewProjectionMatrix();
@@ -87,18 +97,75 @@ pub const Camera = struct {
 
     /// Update camera to follow a target position
     pub fn followTarget(self: *Camera, target_position: [3]f32, offset: [3]f32) void {
-        // Update camera position to follow target with offset
+        // Update camera target
+        self.target[0] = target_position[0];
+        self.target[1] = target_position[1];
+        self.target[2] = target_position[2];
+
+        // Update camera position to maintain the same relative position
         self.position[0] = target_position[0] + offset[0];
         self.position[1] = target_position[1] + offset[1];
         self.position[2] = target_position[2] + offset[2];
 
-        // Update view matrix with new position
+        // Update view matrix with new position and target
         self.updateViewMatrix();
-
-        // Ensure view-projection matrix is updated
-        self.updateViewProjectionMatrix();
     }
 };
+
+/// Look-at function to create view matrix
+fn lookAt(eyeX: f32, eyeY: f32, eyeZ: f32, targetX: f32, targetY: f32, targetZ: f32, upX: f32, upY: f32, upZ: f32, view: *[16]f32) void {
+    // Calculate forward vector (normalized direction from eye to target)
+    var fx = targetX - eyeX;
+    var fy = targetY - eyeY;
+    var fz = targetZ - eyeZ;
+
+    // Normalize forward vector
+    const f_len = math.sqrt(fx * fx + fy * fy + fz * fz);
+    if (f_len > 0.00001) {
+        fx /= f_len;
+        fy /= f_len;
+        fz /= f_len;
+    }
+
+    // Calculate right vector with cross product (forward × up)
+    var rx = fy * upZ - fz * upY;
+    var ry = fz * upX - fx * upZ;
+    var rz = fx * upY - fy * upX;
+
+    // Normalize right vector
+    const r_len = math.sqrt(rx * rx + ry * ry + rz * rz);
+    if (r_len > 0.00001) {
+        rx /= r_len;
+        ry /= r_len;
+        rz /= r_len;
+    }
+
+    // Recalculate up vector with cross product (right × forward)
+    const ux = ry * fz - rz * fy;
+    const uy = rz * fx - rx * fz;
+    const uz = rx * fy - ry * fx;
+
+    // Set the view matrix
+    view[0] = rx;
+    view[1] = ux;
+    view[2] = -fx;
+    view[3] = 0.0;
+
+    view[4] = ry;
+    view[5] = uy;
+    view[6] = -fy;
+    view[7] = 0.0;
+
+    view[8] = rz;
+    view[9] = uz;
+    view[10] = -fz;
+    view[11] = 0.0;
+
+    view[12] = -(rx * eyeX + ry * eyeY + rz * eyeZ);
+    view[13] = -(ux * eyeX + uy * eyeY + uz * eyeZ);
+    view[14] = fx * eyeX + fy * eyeY + fz * eyeZ;
+    view[15] = 1.0;
+}
 
 /// Set matrix to identity
 fn identityMatrix(matrix: *[16]f32) void {
